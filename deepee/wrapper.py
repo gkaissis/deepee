@@ -1,14 +1,14 @@
+from deepee import snooper
 import torch
 from torch import nn
 from copy import deepcopy
 from typing import Optional, Any
-from opacus.dp_model_inspector import DPModelInspector
+from .snooper import ModelSnooper
+
+snooper = ModelSnooper()
 
 
-inspector = DPModelInspector()
-
-
-class DPWrapper(nn.Module):
+class PrivacyWrapper(nn.Module):
     def __init__(
         self,
         base_model: nn.Module,
@@ -50,6 +50,7 @@ class DPWrapper(nn.Module):
         self.noise_multiplier = noise_multiplier
         self.num_replicas = num_replicas
         self.model = base_model(**kwargs)
+        snooper.snoop(self.model)
         self.input_size = getattr(self.model, "input_size", None)
         self.models = self._clone_model(self.model)
 

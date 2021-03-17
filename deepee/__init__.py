@@ -1,5 +1,6 @@
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
-from .dp_wrapper import DPWrapper
+from .wrapper import PrivacyWrapper
+from .snooper import ModelSnooper
 
-__all__ = ["DPWrapper"]
+__all__ = ["PrivacyWrapper", "ModelSnooper"]
