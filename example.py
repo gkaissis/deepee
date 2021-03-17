@@ -103,7 +103,7 @@ class Model(nn.Module):
 
 model = Model()
 
-optimizer = torch.optim.SGD(model.dp_part.model.parameters(), lr=0.1)
+optimizer = torch.optim.SGD(model.dp_part.wrapped_model.parameters(), lr=0.1)
 
 device = "cpu"
 
