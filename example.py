@@ -44,66 +44,68 @@ test_loader = torch.utils.data.DataLoader(
 )
 
 
-# class SimpleNet(nn.Module):
-#     def __init__(self):
-#         super().__init__()
-#         self.fc1 = nn.Linear(784, 256)
-#         self.fc2 = nn.Linear(256, 64)
-#         self.fc3 = nn.Linear(64, 10)
-
-#     def forward(self, x):
-#         x = torch.flatten(x, 1)
-#         x = torch.sigmoid(self.fc1(x))
-#         x = torch.sigmoid(self.fc2(x))
-#         x = self.fc3(x)
-#         return x
-
-
-class PretrainedNet(nn.Module):
+class SimpleNet(nn.Module):
     def __init__(self):
         super().__init__()
         self.fc1 = nn.Linear(784, 256)
         self.fc2 = nn.Linear(256, 64)
+        self.fc3 = nn.Linear(64, 10)
 
     def forward(self, x):
         x = torch.flatten(x, 1)
         x = torch.sigmoid(self.fc1(x))
         x = torch.sigmoid(self.fc2(x))
-        return x
-
-
-class FreshClassifier(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.fc3 = nn.Linear(64, 10)
-
-    def forward(self, x):
         x = self.fc3(x)
         return x
 
 
-class Model(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.pretrained_part = PretrainedNet()
-        # for param in self.pretrained_part.parameters():
-        #     param.requires_grad_(False)
-        self.dp_part = PrivacyWrapper(
-            FreshClassifier,
-            num_replicas=args.batch_size,
-            L2_clip=100,
-            noise_multiplier=0,
-        )
+# class PretrainedNet(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.fc1 = nn.Linear(784, 256)
+#         self.fc2 = nn.Linear(256, 64)
 
-    def forward(self, x):
-        x = self.pretrained_part(x)
-        x = self.dp_part(x)
-        return x
+#     def forward(self, x):
+#         x = torch.flatten(x, 1)
+#         x = torch.sigmoid(self.fc1(x))
+#         x = torch.sigmoid(self.fc2(x))
+#         return x
 
 
-model = Model()
+# class FreshClassifier(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.fc3 = nn.Linear(64, 10)
 
-optimizer = torch.optim.SGD(model.dp_part.wrapped_model.parameters(), lr=0.1)
+#     def forward(self, x):
+#         x = self.fc3(x)
+#         return x
+
+
+# class Model(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.pretrained_part = PretrainedNet()
+#         # for param in self.pretrained_part.parameters():
+#         #     param.requires_grad_(False)
+#         self.dp_part = PrivacyWrapper(
+#             FreshClassifier,
+#             num_replicas=args.batch_size,
+#             L2_clip=100,
+#             noise_multiplier=0,
+#         )
+
+#     def forward(self, x):
+#         x = self.pretrained_part(x)
+#         x = self.dp_part(x)
+#         return x
+
+
+# model = Model()
+
+model = PrivacyWrapper(SimpleNet, args.batch_size, L2_clip=100, noise_multiplier=0.0)
+
+optimizer = torch.optim.SGD(model.wrapped_model.parameters(), lr=0.1)
 
 device = "cpu"
 
@@ -116,10 +118,10 @@ for epoch in range(args.num_epochs):
         output = model(data)
         loss = torch.nn.CrossEntropyLoss()(output, target)
         loss.backward()
-        model.dp_part.clip_and_accumulate()
-        model.dp_part.noise_gradient()
+        model.clip_and_accumulate()
+        model.noise_gradient()
         optimizer.step()
-        model.dp_part.prepare_next_batch()
+        model.prepare_next_batch()
         if batch_idx % args.log_interval == 0:
             print(
                 "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
