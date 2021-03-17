@@ -51,7 +51,7 @@ def test_next_batch():
     wrapped.clip_and_accumulate()
     wrapped.noise_gradient()
     wrapped.prepare_next_batch()
-    main_params = list(wrapped.model.parameters())
+    main_params = list(wrapped.wrapped_model.parameters())
     copy_1_params = list(wrapped.models[0].parameters())
     copy_2_params = list(wrapped.models[1].parameters())
     for mp, c1, c2 in zip(main_params, copy_1_params, copy_2_params):

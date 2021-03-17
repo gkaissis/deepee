@@ -5,8 +5,6 @@ from copy import deepcopy
 from typing import Optional, Any
 from .snooper import ModelSnooper
 
-snooper = ModelSnooper()
-
 
 class PrivacyWrapper(nn.Module):
     def __init__(
@@ -49,14 +47,16 @@ class PrivacyWrapper(nn.Module):
         self.L2_clip = L2_clip
         self.noise_multiplier = noise_multiplier
         self.num_replicas = num_replicas
-        self.model = base_model(**kwargs)
-        snooper.snoop(self.model)
-        self.input_size = getattr(self.model, "input_size", None)
-        self.models = self._clone_model(self.model)
+        self.wrapped_model = base_model(**kwargs)
+        self.snooper = ModelSnooper()
+        self.snooper.snoop(self.wrapped_model)
+        del self.snooper  # snooped enough
+        self.input_size = getattr(self.wrapped_model, "input_size", None)
+        self.models = self._clone_model(self.wrapped_model)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if not self.training:
-            return self.model(x)
+            return self.wrapped_model(x)
         else:
             if not self.num_replicas == x.shape[0]:
                 raise ValueError(
@@ -90,7 +90,9 @@ class PrivacyWrapper(nn.Module):
             for m in self.models
         ]  # a list of length = self.replicas which holds lists of parameter gradients
 
-        for param, gradient_source in zip(self.model.parameters(), zip(*model_grads)):
+        for param, gradient_source in zip(
+            self.wrapped_model.parameters(), zip(*model_grads)
+        ):
             if param.requires_grad:
                 setattr(
                     param,
@@ -101,7 +103,7 @@ class PrivacyWrapper(nn.Module):
     @torch.no_grad()
     def noise_gradient(self) -> None:
         """Applies noise to the gradient before the optimizer step."""
-        for param in self.model.parameters():
+        for param in self.wrapped_model.parameters():
             if param.requires_grad and hasattr(param, "accumulated_gradients"):
                 aggregated_gradient = torch.mean(param.accumulated_gradients, dim=0)
                 noise = torch.randn_like(aggregated_gradient) * (
@@ -118,7 +120,7 @@ class PrivacyWrapper(nn.Module):
         the updated weights.
         """
         for model in self.models:
-            model.load_state_dict(self.model.state_dict())
+            model.load_state_dict(self.wrapped_model.state_dict())
 
     @torch.no_grad()
     def _clone_model(self, model):

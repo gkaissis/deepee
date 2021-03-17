@@ -9,7 +9,7 @@ class args:
     batch_size = 200
     test_batch_size = 64
     log_interval = 1000
-    num_epochs = 1
+    num_epochs = 5
 
 
 train_loader = torch.utils.data.DataLoader(
@@ -44,29 +44,66 @@ test_loader = torch.utils.data.DataLoader(
 )
 
 
-class SimpleNet(nn.Module):
+# class SimpleNet(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.fc1 = nn.Linear(784, 256)
+#         self.fc2 = nn.Linear(256, 64)
+#         self.fc3 = nn.Linear(64, 10)
+
+#     def forward(self, x):
+#         x = torch.flatten(x, 1)
+#         x = torch.sigmoid(self.fc1(x))
+#         x = torch.sigmoid(self.fc2(x))
+#         x = self.fc3(x)
+#         return x
+
+
+class PretrainedNet(nn.Module):
     def __init__(self):
-        super(SimpleNet, self).__init__()
+        super().__init__()
         self.fc1 = nn.Linear(784, 256)
         self.fc2 = nn.Linear(256, 64)
-        self.fc3 = nn.Linear(64, 10)
-        self.norm = nn.InstanceNorm2d(64, track_running_stats=True)
-        self.norm2 = nn.BatchNorm2d(64, track_running_stats=True)
 
     def forward(self, x):
         x = torch.flatten(x, 1)
         x = torch.sigmoid(self.fc1(x))
         x = torch.sigmoid(self.fc2(x))
+        return x
+
+
+class FreshClassifier(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc3 = nn.Linear(64, 10)
+
+    def forward(self, x):
         x = self.fc3(x)
         return x
 
 
-model = PrivacyWrapper(
-    SimpleNet, num_replicas=args.batch_size, L2_clip=100, noise_multiplier=0
-)
+class Model(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.pretrained_part = PretrainedNet()
+        # for param in self.pretrained_part.parameters():
+        #     param.requires_grad_(False)
+        self.dp_part = PrivacyWrapper(
+            FreshClassifier,
+            num_replicas=args.batch_size,
+            L2_clip=100,
+            noise_multiplier=0,
+        )
 
-exit(0)
-optimizer = torch.optim.SGD(model.model.parameters(), lr=0.1)
+    def forward(self, x):
+        x = self.pretrained_part(x)
+        x = self.dp_part(x)
+        return x
+
+
+model = Model()
+
+optimizer = torch.optim.SGD(model.dp_part.model.parameters(), lr=0.1)
 
 device = "cpu"
 
@@ -79,10 +116,10 @@ for epoch in range(args.num_epochs):
         output = model(data)
         loss = torch.nn.CrossEntropyLoss()(output, target)
         loss.backward()
-        model.clip_and_accumulate()
-        model.noise_gradient()
+        model.dp_part.clip_and_accumulate()
+        model.dp_part.noise_gradient()
         optimizer.step()
-        model.prepare_for_next_batch()
+        model.dp_part.prepare_next_batch()
         if batch_idx % args.log_interval == 0:
             print(
                 "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
