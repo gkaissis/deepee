@@ -32,16 +32,16 @@ class PrivacyWrapper(nn.Module):
 
         Sample use:
 
-        > model = DPWrapper(resnet18, num_replicas=64, L2_clip=1., noise_multiplier=1.)
-        > optimizer = torch.optim.SGD(model.model.parameters(), lr=0.1)
-        > y_pred = model(data)
-        > loss = criterion(y_pred, y_true)
-        > loss.backward()
-        > model.clip_and_accumulate()
-        > model.noise_gradient()
-        > optimizer.step()
-        > model.prepare_next_batch()
-        > ...(repeat)
+        >> model = DPWrapper(resnet18, num_replicas=64, L2_clip=1., noise_multiplier=1.)
+        >> optimizer = torch.optim.SGD(model.model.parameters(), lr=0.1)
+        >> y_pred = model(data)
+        >> loss = criterion(y_pred, y_true)
+        >> loss.backward()
+        >> model.clip_and_accumulate()
+        >> model.noise_gradient()
+        >> optimizer.step()
+        >> model.prepare_next_batch()
+        >> ...(repeat)
         """
         super().__init__()
         self.L2_clip = L2_clip
@@ -63,7 +63,7 @@ class PrivacyWrapper(nn.Module):
                     f"num_replicas ({self.num_replicas}) must be equal to the batch size ({x.shape[0]})."
                 )
             y_pred = torch.nn.parallel.parallel_apply(
-                self.models, torch.stack(x.split(1))
+                self.models, torch.stack(x.split(1))  # type: ignore
             )
             return torch.cat(y_pred)
 

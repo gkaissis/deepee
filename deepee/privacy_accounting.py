@@ -21,6 +21,7 @@ Most of this code is straight outta TensorFlow Privacy
 https://github.com/tensorflow/privacy/blob/master/tensorflow_privacy/privacy/analysis/gdp_accountant.py
 Documentation improvements. The Poisson subsampling is removed since the PrivacyWrapper
 needs a fixed batch size. We implement a slightly nicer interface.
+Code reused under Apache-2.0 License terms.
 """
 
 import numpy as np
