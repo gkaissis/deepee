@@ -33,15 +33,20 @@ def compute_mu_uniform(epoch, noise_multi, n, batch_size):
 
     t = epoch * n / batch_size
     c = batch_size * np.sqrt(t) / n
-    return np.sqrt(2) * c * np.sqrt(
-        np.exp(noise_multi**(-2)) * norm.cdf(1.5 / noise_multi) +
-        3 * norm.cdf(-0.5 / noise_multi) - 2)
+    return (
+        np.sqrt(2)
+        * c
+        * np.sqrt(
+            np.exp(noise_multi ** (-2)) * norm.cdf(1.5 / noise_multi)
+            + 3 * norm.cdf(-0.5 / noise_multi)
+            - 2
+        )
+    )
 
 
 def delta_eps_mu(eps, mu):
     """Compute dual between mu-GDP and (epsilon, delta)-DP."""
-    return norm.cdf(-eps / mu +
-                    mu / 2) - np.exp(eps) * norm.cdf(-eps / mu - mu / 2)
+    return norm.cdf(-eps / mu + mu / 2) - np.exp(eps) * norm.cdf(-eps / mu - mu / 2)
 
 
 def eps_from_mu(mu, delta):
@@ -51,13 +56,15 @@ def eps_from_mu(mu, delta):
         """Reversely solve dual by matching delta."""
         return delta_eps_mu(x, mu) - delta
 
-    return optimize.root_scalar(f, bracket=[0, 500], method='brentq').root
+    return optimize.root_scalar(f, bracket=[0, 500], method="brentq").root
 
 
-def compute_eps_uniform(epoch:int, noise_multi:float, n:int, batch_size:int, delta:float)->float:
+def compute_eps_uniform(
+    epoch: int, noise_multi: float, n: int, batch_size: int, delta: float
+) -> float:
     """Computes the epsilon value for a given delta of a subsampled gaussian mechanism
     with uniform subsampling using Gaussian Differential Privacy.
-    For more information see Bu et al. (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7695347/) 
+    For more information see Dong et al. (https://arxiv.org/abs/1905.02383).
 
     Args:
         epoch (int): How many epochs the model has been trained for.
@@ -71,5 +78,4 @@ def compute_eps_uniform(epoch:int, noise_multi:float, n:int, batch_size:int, del
         epsilon (float): The epsilon value.
     """
 
-    return eps_from_mu(
-        compute_mu_uniform(epoch, noise_multi, n, batch_size), delta)
+    return eps_from_mu(compute_mu_uniform(epoch, noise_multi, n, batch_size), delta)

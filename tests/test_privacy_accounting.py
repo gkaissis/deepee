@@ -1,4 +1,4 @@
-from deepee.accountant import compute_eps_uniform
+from deepee.privacy_accounting import compute_eps_uniform
 
 
 def test_epsilon_uniform():

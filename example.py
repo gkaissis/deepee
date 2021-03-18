@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 
 class args:
-    batch_size = 200
+    batch_size = 64
     test_batch_size = 64
     log_interval = 1000
     num_epochs = 5
@@ -44,19 +44,19 @@ test_loader = torch.utils.data.DataLoader(
 )
 
 
-class SimpleNet(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.fc1 = nn.Linear(784, 256)
-        self.fc2 = nn.Linear(256, 64)
-        self.fc3 = nn.Linear(64, 10)
+# class SimpleNet(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#         self.fc1 = nn.Linear(784, 256)
+#         self.fc2 = nn.Linear(256, 64)
+#         self.fc3 = nn.Linear(64, 10)
 
-    def forward(self, x):
-        x = torch.flatten(x, 1)
-        x = torch.sigmoid(self.fc1(x))
-        x = torch.sigmoid(self.fc2(x))
-        x = self.fc3(x)
-        return x
+#     def forward(self, x):
+#         x = torch.flatten(x, 1)
+#         x = torch.sigmoid(self.fc1(x))
+#         x = torch.sigmoid(self.fc2(x))
+#         x = self.fc3(x)
+#         return x
 
 
 # class PretrainedNet(nn.Module):
@@ -103,11 +103,20 @@ class SimpleNet(nn.Module):
 
 # model = Model()
 
-model = PrivacyWrapper(SimpleNet, args.batch_size, L2_clip=100, noise_multiplier=0.0)
+from torchvision.models import vgg16
+
+model = PrivacyWrapper(vgg16, args.batch_size, L2_clip=100, noise_multiplier=0.0)
 
 optimizer = torch.optim.SGD(model.wrapped_model.parameters(), lr=0.1)
 
 device = "cpu"
+
+data = torch.randn(64, 3, 224, 224)
+
+output = model(data)
+
+while True:
+    pass
 
 # Train
 for epoch in range(args.num_epochs):
