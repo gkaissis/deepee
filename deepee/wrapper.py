@@ -59,10 +59,6 @@ class PrivacyWrapper(nn.Module):
         self.noise_multiplier = noise_multiplier
         self.num_replicas = num_replicas
         self.wrapped_model = base_model(**kwargs)
-        # self.device = self._check_device(self.wrapped_model)
-        self.device = next(
-            iter(set([param.device.type for param in self.wrapped_model.parameters()]))
-        )
         self.snooper = ModelSnooper()
         self.snooper.snoop(self.wrapped_model)
         del self.snooper  # snooped enough
@@ -148,11 +144,7 @@ class PrivacyWrapper(nn.Module):
                 aggregated_gradient = torch.mean(param.accumulated_gradients, dim=0)
                 if not self.secure_rng:
                     if self.seed:
-                        torch.manual_seed(
-                            self.seed
-                        ) if self.device == "cpu" else torch.cuda.manual_seed(
-                            self.seed  # type: ignore
-                        )
+                        torch.manual_seed(self.seed)
                     noise = torch.randn_like(aggregated_gradient) * (
                         self.L2_clip
                         * self.noise_multiplier
@@ -200,16 +192,3 @@ class PrivacyWrapper(nn.Module):
         raise ValueError(
             "The DPWrapper instance has no own parameters. Please use <Instance>.model.parameters()"
         )
-
-    def to(self, device: Union[torch.device, str]):  # type:ignore
-        self.wrapped_model = self.wrapped_model.to(device)
-        for model in self.models:
-            model = model.to(device)
-        self.device = device
-        return self
-
-    def cuda(self):
-        raise ValueError("Please call .to('cuda')")
-
-    def cpu(self):
-        raise ValueError("Please call .to('cpu')")
