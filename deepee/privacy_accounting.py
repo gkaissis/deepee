@@ -27,6 +27,7 @@ Code reused under Apache-2.0 License terms.
 import numpy as np
 from scipy import optimize
 from scipy.stats import norm
+from torch._C import Value
 
 
 def compute_mu_uniform(epoch: float, noise_multi: float, n: int, batch_size: int):
@@ -57,7 +58,13 @@ def eps_from_mu(mu, delta):
         """Reversely solve dual by matching delta."""
         return delta_eps_mu(x, mu) - delta
 
-    return optimize.root_scalar(f, bracket=[0, 500], method="brentq").root
+    try:
+        root = optimize.root_scalar(f, bracket=[0, 500], method="brentq").root
+    except ValueError as e:
+        raise RuntimeError(
+            "Epsilon could not be determined, likely because of implausible values for the L2 clip ratio and/or the noise multiplier. Try decreasing the L2 clip ratio or increasing the noise multiplier. If you are trying to 'disable' DP by setting these values, errors can be avoided by not attaching a WatchDog to your PrivacyWrapper."
+        ) from e
+    return root
 
 
 def compute_eps_uniform(

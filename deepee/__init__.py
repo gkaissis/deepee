@@ -1,9 +1,10 @@
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 from .wrapper import PrivacyWrapper
 from .snooper import ModelSnooper
 from .dataloader import UniformDataLoader
 from .surgery import ModelSurgeon, SurgicalProcedures
+from .watchdog import PrivacyWatchdog
 
 __all__ = [
     "PrivacyWrapper",
@@ -11,4 +12,5 @@ __all__ = [
     "UniformDataLoader",
     "ModelSurgeon",
     "SurgicalProcedures",
+    "PrivacyWatchdog",
 ]

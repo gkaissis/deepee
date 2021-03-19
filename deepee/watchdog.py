@@ -77,12 +77,13 @@ class PrivacyWatchdog:
         if steps_taken % self.report_every_n_steps == 0:
             logging.info(f"Privacy spent at {steps_taken} steps: {spent:.2f}")
 
-        if (spent >= self.target_epsilon) and self.abort:  # type: ignore
-            self.abort_training(epsilon_spent=spent, save=self.save, path=self.path)
-        else:
-            logging.warning(
-                f"Privacy budget exhausted. Epsilon spent is {spent}, epsilon allowed is {self.target_epsilon:.2f} at delta {self.target_delta:.2f}"
-            )
+        if spent >= self.target_epsilon:
+            if self.abort:  # type: ignore
+                self.abort_training(epsilon_spent=spent, save=self.save, path=self.path)
+            else:
+                logging.warning(
+                    f"Privacy budget exhausted. Epsilon spent is {spent}, epsilon allowed is {self.target_epsilon:.2f} at delta {self.target_delta:.2e}"
+                )
 
     def abort_training(
         self,
@@ -92,10 +93,10 @@ class PrivacyWatchdog:
     ):
         if not save:
             raise PrivacyBudgetExhausted(
-                f"Privacy budget exhausted. Epsilon spent is {epsilon_spent}, epsilon allowed is {self.target_epsilon:.2f} at delta {self.target_delta:.2f}"
+                f"Privacy budget exhausted. Epsilon spent is {epsilon_spent}, epsilon allowed is {self.target_epsilon:.2f} at delta {self.target_delta:e}"
             )
         else:
             torch.save(self.wrapper.wrapped_model, path)  # type: ignore
             raise PrivacyBudgetExhausted(
-                f"Privacy budget exhausted. Epsilon spent is {epsilon_spent}, epsilon allowed is {self.target_epsilon:.2f} at delta {self.target_delta:.2f}"
+                f"Privacy budget exhausted. Epsilon spent is {epsilon_spent}, epsilon allowed is {self.target_epsilon:.2f} at delta {self.target_delta:.2e}"
             )
