@@ -1,7 +1,9 @@
 import torch
 from torch import nn
 from copy import deepcopy
-from typing import Optional, Any
+from typing import Optional, Any, Union
+
+from functools import partial
 from .snooper import ModelSnooper
 from .watchdog import PrivacyWatchdog
 
@@ -57,7 +59,10 @@ class PrivacyWrapper(nn.Module):
         self.noise_multiplier = noise_multiplier
         self.num_replicas = num_replicas
         self.wrapped_model = base_model(**kwargs)
-        self.device = self._check_device(self.wrapped_model)
+        # self.device = self._check_device(self.wrapped_model)
+        self.device = next(
+            iter(set([param.device.type for param in self.wrapped_model.parameters()]))
+        )
         self.snooper = ModelSnooper()
         self.snooper.snoop(self.wrapped_model)
         del self.snooper  # snooped enough
@@ -196,10 +201,15 @@ class PrivacyWrapper(nn.Module):
             "The DPWrapper instance has no own parameters. Please use <Instance>.model.parameters()"
         )
 
-    def _check_device(self, model):
-        devices = set()
-        for param in model.parameters():
-            devices.add(param.device.type)
-        if not len(devices) == 1:
-            raise RuntimeError("All model parameters have to be on the same device")
-        return next(iter(devices))
+    def to(self, device: Union[torch.device, str]):  # type:ignore
+        self.wrapped_model = self.wrapped_model.to(device)
+        for model in self.models:
+            model = model.to(device)
+        self.device = device
+        return self
+
+    def cuda(self):
+        raise ValueError("Please call .to('cuda')")
+
+    def cpu(self):
+        raise ValueError("Please call .to('cpu')")
