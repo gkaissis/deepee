@@ -47,6 +47,10 @@ class PrivacyWatchdog:
             Defaults to None.
         """
         self.dataloader = dataloader
+        if not isinstance(self.dataloader, UniformDataLoader):
+            logging.critical(
+                "Privacy accounting is only correct when using the UniformDataLoader or a custom DataLoader with a batch_sampler implementing uniform sampling without replacement."
+            )
         self.target_epsilon = target_epsilon
         self.target_delta = target_delta
         self.report_every_n_steps = report_every_n_steps
@@ -64,14 +68,17 @@ class PrivacyWatchdog:
             raise ValueError("When setting 'save', a path to save to must be provided.")
 
     def inform(self, steps_taken: int) -> None:
-        epoch = (steps_taken * self.dataloader.batch_size) / len(  # type: ignore
+        batch_size = (
+            self.dataloader.batch_size or self.dataloader.batch_sampler.batch_size
+        )
+        epoch = (steps_taken * batch_size) / len(  # type: ignore
             self.dataloader.dataset  # type: ignore
         )
         spent = compute_eps_uniform(
             epoch=epoch,
             noise_multi=self.wrapper.noise_multiplier,  # type: ignore
             n=len(self.dataloader.dataset),  # type: ignore
-            batch_size=self.dataloader.batch_size,  # type: ignore
+            batch_size=batch_size,  # type: ignore
             delta=self.target_delta,  # type: ignore
         )
         if steps_taken % self.report_every_n_steps == 0:

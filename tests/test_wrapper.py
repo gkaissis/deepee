@@ -122,16 +122,37 @@ def test_raises_param_error():
         params = wrapped.parameters()
 
 
-def test_check_device():
+def test_check_device_cpu():
     wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0).to("cpu")
-    assert wrapped.device == "cpu"
+    assert (
+        next(
+            iter(
+                set([param.device.type for param in wrapped.wrapped_model.parameters()])
+            )
+        )
+        == "cpu"
+    )
     for model in wrapped.models:
-        assert list(model.parameters())[0].device.type == "cpu"
+        assert (
+            next(iter(set([param.device.type for param in model.parameters()])))
+            == "cpu"
+        )
+
+
+def test_check_device_gpu():
     if torch.cuda.is_available():
         wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0).to("cuda")
-        assert "cuda" in wrapped.device
+        assert "cuda" in next(
+            iter(
+                set([param.device.type for param in wrapped.wrapped_model.parameters()])
+            )
+        )
         for model in wrapped.models:
-            assert "cuda" in list(model.parameters())[0].device.type
+            assert "cuda" in next(
+                iter(set([param.device.type for param in model.parameters()]))
+            )
+    else:
+        pass
 
 
 def test_raises_rng_collision():
