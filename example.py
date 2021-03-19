@@ -2,7 +2,9 @@ from deepee import PrivacyWrapper
 import torch
 from torch import nn
 from torchvision import datasets, transforms
-from tqdm import tqdm
+
+# from tqdm import tqdm
+from deepee import UniformDataLoader
 
 
 class args:
@@ -11,6 +13,45 @@ class args:
     log_interval = 1000
     num_epochs = 5
 
+
+class Model(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.lin = torch.nn.Linear(1, 1)
+
+    def forward(self, x):
+        return self.lin(x)
+
+
+class DS(torch.utils.data.Dataset):
+    def __init__(self):
+        self.features = torch.linspace(0, 1, 1000).requires_grad_(True)
+        self.labels = torch.linspace(0, 1, 1000).requires_grad_(True)
+
+    def __getitem__(self, idx):
+        return (self.features, self.labels)
+
+    def __len__(self):
+        return len(self.features)
+
+
+dl = UniformDataLoader(DS(), batch_size=2)
+
+model = PrivacyWrapper(Model, 2, 1.0, 1.0)
+
+optimizer = torch.optim.Adam(model.wrapped_model.parameters(), lr=4e-3)
+
+for feature, label in dl:
+    output = model(feature[..., None])
+    loss = ((output - label[..., None]) ** 2).mean()
+    loss.backward()
+    model.clip_and_accumulate()
+    model.noise_gradient()
+    optimizer.step()
+    model.prepare_next_batch()
+    print(loss.item())
+
+exit()
 
 train_loader = torch.utils.data.DataLoader(
     datasets.MNIST(

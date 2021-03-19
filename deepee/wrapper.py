@@ -1,4 +1,3 @@
-from deepee import snooper
 import torch
 from torch import nn
 from copy import deepcopy
