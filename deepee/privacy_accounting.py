@@ -29,7 +29,7 @@ from scipy import optimize
 from scipy.stats import norm
 
 
-def compute_mu_uniform(epoch, noise_multi, n, batch_size):
+def compute_mu_uniform(epoch: float, noise_multi: float, n: int, batch_size: int):
     """Compute mu from uniform subsampling."""
 
     t = epoch * n / batch_size
@@ -61,14 +61,15 @@ def eps_from_mu(mu, delta):
 
 
 def compute_eps_uniform(
-    epoch: int, noise_multi: float, n: int, batch_size: int, delta: float
+    epoch: float, noise_multi: float, n: int, batch_size: int, delta: float
 ) -> float:
     """Computes the epsilon value for a given delta of a subsampled gaussian mechanism
     with uniform subsampling using Gaussian Differential Privacy.
     For more information see Dong et al. (https://arxiv.org/abs/1905.02383).
 
     Args:
-        epoch (int): How many epochs the model has been trained for.
+        epoch (float): How many epochs the model has been trained for. Can be a decimal
+        for a fraction of an epoch.
         noise_multi (float): Noise multiplier of the PrivacyWrapper.
         n (int): Total training dataset size.
         batch_size (int): Batch size used for training. Same as num_replicas

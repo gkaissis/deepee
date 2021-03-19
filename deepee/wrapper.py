@@ -3,7 +3,7 @@ from torch import nn
 from copy import deepcopy
 from typing import Optional, Any
 from .snooper import ModelSnooper
-import warnings
+from .watchdog import PrivacyWatchdog
 
 
 class PrivacyWrapper(nn.Module):
@@ -15,6 +15,7 @@ class PrivacyWrapper(nn.Module):
         noise_multiplier: float,
         secure_rng: bool = False,
         seed: Optional[int] = None,
+        watchdog: Optional[PrivacyWatchdog] = None,
         **kwargs: Optional[Any],
     ) -> None:
         """Factory class which wraps any model and returns a model suitable for DP-SGD learning.
@@ -31,6 +32,7 @@ class PrivacyWrapper(nn.Module):
             secure RNG has a significant performance overhead from collecting entropy at each
             step.
             seed (optional int): The seed for the (insecure) random number generator. This is incompatible with the cryptographic RNG and will raise an error if both are set.
+            watchdog (optional PrivacyWatchDog): A PrivacyWatchdog instance to attach to the PrivacyWrapper.
 
         For more information on L2_clip and noise_multiplier, see Abadi et al., 2016.
 
@@ -59,6 +61,9 @@ class PrivacyWrapper(nn.Module):
         self.snooper = ModelSnooper()
         self.snooper.snoop(self.wrapped_model)
         del self.snooper  # snooped enough
+        self.watchdog = watchdog
+        if self.watchdog:
+            setattr(self.watchdog, "wrapper", self)
         self.input_size = getattr(self.wrapped_model, "input_size", None)
         self.models = self._clone_model(self.wrapped_model)
         self.seed = seed
@@ -162,7 +167,8 @@ class PrivacyWrapper(nn.Module):
     @torch.no_grad()
     def prepare_next_batch(self) -> None:
         """Prepare model for the next batch by re-initializing the model replicas with
-        the updated weights.
+        the updated weights and informing the PrivacyWatchdog about the state of the
+        training.
         """
         for model in self.models:
             model.load_state_dict(self.wrapped_model.state_dict())
@@ -174,7 +180,8 @@ class PrivacyWrapper(nn.Module):
             )
         self._steps_taken += 1
         self._forward_succesful = self._clip_succesful = self._noise_succesful = False
-        # Ugly but effective side-effects
+        if self.watchdog:
+            self.watchdog.inform(self._steps_taken)
 
     @torch.no_grad()
     def _clone_model(self, model):
