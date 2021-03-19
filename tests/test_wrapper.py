@@ -32,9 +32,29 @@ def test_clip_accum():
     wrapped.clip_and_accumulate()
 
 
-def test_noise():
+def test_noise_insecure():
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0, secure_rng=False, seed=None)
+    output = wrapped(data)
+    loss = output.mean()
+    loss.backward()
+    wrapped.clip_and_accumulate()
+    wrapped.noise_gradient()
+
+
+def test_noise_insecure_seed():
+    data = torch.randn(2, 1, 10)
+    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0, secure_rng=False, seed=42)
+    output = wrapped(data)
+    loss = output.mean()
+    loss.backward()
+    wrapped.clip_and_accumulate()
+    wrapped.noise_gradient()
+
+
+def test_noise_secure():
+    data = torch.randn(2, 1, 10)
+    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0, secure_rng=True)
     output = wrapped(data)
     loss = output.mean()
     loss.backward()
@@ -62,3 +82,20 @@ def test_raises_param_error():
     wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
     with pytest.raises(ValueError):
         params = wrapped.parameters()
+
+
+def test_check_device():
+    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0).to("cpu")
+    assert wrapped.device == "cpu"
+    for model in wrapped.models:
+        assert list(model.parameters())[0].device.type == "cpu"
+    if torch.cuda.is_available():
+        wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0).to("cuda")
+        assert "cuda" in wrapped.device
+        for model in wrapped.models:
+            assert "cuda" in list(model.parameters())[0].device.type
+
+
+def test_raises_rng_collision():
+    with pytest.raises(ValueError):
+        wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0, secure_rng=True, seed=42)
