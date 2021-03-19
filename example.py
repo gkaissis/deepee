@@ -1,3 +1,4 @@
+from deepee.watchdog import PrivacyWatchdog
 from deepee import PrivacyWrapper
 import torch
 from torch import nn
@@ -8,13 +9,14 @@ from deepee import UniformDataLoader
 
 
 class args:
-    batch_size = 64
-    test_batch_size = 64
+    batch_size = 200
+    test_batch_size = 200
     log_interval = 1000
     num_epochs = 5
+    device = "cuda"
 
 
-train_loader = torch.utils.data.DataLoader(
+train_loader = UniformDataLoader(
     datasets.MNIST(
         "./data",
         train=True,
@@ -27,8 +29,6 @@ train_loader = torch.utils.data.DataLoader(
         ),
     ),
     batch_size=args.batch_size,
-    shuffle=True,
-    drop_last=True,
 )
 test_loader = torch.utils.data.DataLoader(
     datasets.MNIST(
@@ -46,19 +46,19 @@ test_loader = torch.utils.data.DataLoader(
 )
 
 
-# class SimpleNet(nn.Module):
-#     def __init__(self):
-#         super().__init__()
-#         self.fc1 = nn.Linear(784, 256)
-#         self.fc2 = nn.Linear(256, 64)
-#         self.fc3 = nn.Linear(64, 10)
+class SimpleNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc1 = nn.Linear(784, 256)
+        self.fc2 = nn.Linear(256, 64)
+        self.fc3 = nn.Linear(64, 10)
 
-#     def forward(self, x):
-#         x = torch.flatten(x, 1)
-#         x = torch.sigmoid(self.fc1(x))
-#         x = torch.sigmoid(self.fc2(x))
-#         x = self.fc3(x)
-#         return x
+    def forward(self, x):
+        x = torch.flatten(x, 1)
+        x = torch.sigmoid(self.fc1(x))
+        x = torch.sigmoid(self.fc2(x))
+        x = self.fc3(x)
+        return x
 
 
 # class PretrainedNet(nn.Module):
@@ -102,21 +102,15 @@ test_loader = torch.utils.data.DataLoader(
 #         x = self.dp_part(x)
 #         return x
 
+watchdog = PrivacyWatchdog(
+    train_loader, target_epsilon=1.0, abort=True, target_delta=1e-5
+)
 
-# model = Model()
-
-from torchvision.models import vgg16
-
-model = PrivacyWrapper(vgg16, args.batch_size, L2_clip=100, noise_multiplier=0.0)
-
+model = PrivacyWrapper(SimpleNet, args.batch_size, 1.0, 1.0, watchdog=watchdog).to(
+    args.device
+)
 optimizer = torch.optim.SGD(model.wrapped_model.parameters(), lr=0.1)
-
-device = "cpu"
-
-data = torch.randn(64, 3, 224, 224)
-
-output = model(data)
-
+device = args.device
 
 # Train
 for epoch in range(args.num_epochs):
