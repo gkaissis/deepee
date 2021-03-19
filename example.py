@@ -117,13 +117,11 @@ data = torch.randn(64, 3, 224, 224)
 
 output = model(data)
 
-while True:
-    pass
 
 # Train
 for epoch in range(args.num_epochs):
     model.train()
-    for batch_idx, (data, target) in tqdm(enumerate(train_loader)):
+    for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
         output = model(data)

@@ -78,6 +78,44 @@ def test_next_batch():
         assert (mp == c1).all() and (mp == c2).all() and (c1 == c2).all()
 
 
+def test_verification_and_steps_taken():
+    data = torch.randn(2, 1, 10)
+    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    assert wrapped._steps_taken == 0
+    assert (
+        wrapped._forward_succesful
+        == wrapped._noise_succesful
+        == wrapped._clip_succesful
+        == False
+    )
+    output = wrapped(data)
+    assert wrapped._forward_succesful == True
+    loss = output.mean()
+    loss.backward()
+    wrapped.clip_and_accumulate()
+    assert wrapped._clip_succesful == True
+    wrapped.noise_gradient()
+    assert wrapped._noise_succesful == True
+    wrapped.prepare_next_batch()
+    assert wrapped._steps_taken == 1
+    with pytest.raises(RuntimeError):
+        wrapped.prepare_next_batch()  # call a second time to raise error
+    assert wrapped._steps_taken == 1  # steps should still be 1
+
+
+def test_steps_taken():
+    data = torch.randn(2, 1, 10)
+    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    for _ in range(5):
+        output = wrapped(data)
+        loss = output.mean()
+        loss.backward()
+        wrapped.clip_and_accumulate()
+        wrapped.noise_gradient()
+        wrapped.prepare_next_batch()
+    assert wrapped._steps_taken == 5
+
+
 def test_raises_param_error():
     wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
     with pytest.raises(ValueError):

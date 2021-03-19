@@ -77,12 +77,15 @@ class PrivacyWrapper(nn.Module):
                     "To use the secure RNG, torchcsprng must be installed."
                 ) from e
 
-        self.steps_taken = 0
+        self._steps_taken = 0
+        self._forward_succesful = False
+        self._clip_succesful = False
+        self._noise_succesful = False
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if not self.training:
             return self.wrapped_model(x)
-        else:
+        else:  # in training mode
             if not self.num_replicas == x.shape[0]:
                 raise ValueError(
                     f"num_replicas ({self.num_replicas}) must be equal to the batch size ({x.shape[0]})."
@@ -90,6 +93,7 @@ class PrivacyWrapper(nn.Module):
             y_pred = torch.nn.parallel.parallel_apply(
                 self.models, torch.stack(x.split(1))  # type: ignore
             )
+            self._forward_succesful = True
             return torch.cat(y_pred)
 
     @torch.no_grad()
@@ -124,6 +128,7 @@ class PrivacyWrapper(nn.Module):
                     "accumulated_gradients",
                     torch.stack([grad for grad in gradient_source]),
                 )
+        self._clip_succesful = True
 
     @torch.no_grad()
     def noise_gradient(self) -> None:
@@ -152,6 +157,7 @@ class PrivacyWrapper(nn.Module):
                     )
                 param.grad = aggregated_gradient + noise
                 param.accumulated_gradients = None  # free memory
+                self._noise_succesful = True
 
     @torch.no_grad()
     def prepare_next_batch(self) -> None:
@@ -160,6 +166,15 @@ class PrivacyWrapper(nn.Module):
         """
         for model in self.models:
             model.load_state_dict(self.wrapped_model.state_dict())
+        if not (
+            self._forward_succesful and self._clip_succesful and self._noise_succesful
+        ):
+            raise RuntimeError(
+                "An error occured during model training. Please ascertain that the model.forward(), model.clip_and_accumulate() and model.noise_gradient() methods were called successfuly and in order."
+            )
+        self._steps_taken += 1
+        self._forward_succesful = self._clip_succesful = self._noise_succesful = False
+        # Ugly but effective side-effects
 
     @torch.no_grad()
     def _clone_model(self, model):
