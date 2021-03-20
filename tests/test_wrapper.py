@@ -1,3 +1,4 @@
+from deepee.watchdog import PrivacyWatchdog
 from deepee import PrivacyWrapper
 import torch
 import pytest
@@ -114,6 +115,31 @@ def test_steps_taken():
         wrapped.noise_gradient()
         wrapped.prepare_next_batch()
     assert wrapped._steps_taken == 5
+
+
+def test_in_order():
+    """Case 1: forward not called before clip"""
+    data = torch.randn(2, 1, 10)
+    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    with pytest.raises(RuntimeError):
+        wrapped.clip_and_accumulate()
+
+    """Case 2: clip not called before noise"""
+    data = torch.randn(2, 1, 10)
+    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    output = wrapped(data)
+    with pytest.raises(RuntimeError):
+        wrapped.noise_gradient()
+
+    """Case 3: noise not called before prepare """
+    data = torch.randn(2, 1, 10)
+    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    output = wrapped(data)
+    loss = output.mean()
+    loss.backward()
+    wrapped.clip_and_accumulate()
+    with pytest.raises(RuntimeError):
+        wrapped.prepare_next_batch()
 
 
 def test_raises_param_error():
