@@ -3,8 +3,6 @@ from deepee import PrivacyWrapper
 import torch
 from torch import nn
 from torchvision import datasets, transforms
-
-# from tqdm import tqdm
 from deepee import UniformDataLoader
 
 

@@ -125,3 +125,6 @@ venv.bak/
 dmypy.json
 
 data
+
+#poetry
+poetry.lock
