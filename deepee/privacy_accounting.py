@@ -58,13 +58,7 @@ def eps_from_mu(mu, delta):
         """Reversely solve dual by matching delta."""
         return delta_eps_mu(x, mu) - delta
 
-    try:
-        root = optimize.root_scalar(f, bracket=[0, 500], method="brentq").root
-    except ValueError as e:
-        raise RuntimeError(
-            "Epsilon could not be determined, likely because of implausible values for the L2 clip ratio and/or the noise multiplier. Try decreasing the L2 clip ratio or increasing the noise multiplier. If you are trying to 'disable' DP by setting these values, errors can be avoided by not attaching a WatchDog to your PrivacyWrapper."
-        ) from e
-    return root
+    return optimize.root_scalar(f, bracket=[0, 500], method="brentq").root
 
 
 def compute_eps_uniform(
@@ -86,5 +80,13 @@ def compute_eps_uniform(
     Returns:
         epsilon (float): The epsilon value.
     """
-
-    return eps_from_mu(compute_mu_uniform(epoch, noise_multi, n, batch_size), delta)
+    try:
+        return eps_from_mu(compute_mu_uniform(epoch, noise_multi, n, batch_size), delta)
+    except ValueError as e:
+        raise RuntimeError(
+            "Epsilon could not be determined, likely because of implausible values"
+            " for the L2 clip ratio and/or the noise multiplier. Try decreasing the"
+            " L2 clip ratio or increasing the noise multiplier. If you are trying to"
+            " 'disable' DP by setting these values, errors can be avoided by not"
+            " attaching a WatchDog to your PrivacyWrapper."
+        ) from e
