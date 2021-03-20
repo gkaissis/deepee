@@ -21,10 +21,11 @@ class UniformDataLoader(DataLoader):
             batch_size (int): The desired batch size.
             num_workers (int, optional): How many workers to use. Defaults to 0.
             May result in deadlocks or similar undefined behaviour, in which case it is
-            recommended to set this to 0. Compare https://pytorch.org/docs/stable/data.html#single-and-multi-process-data-loading. When using CUDA, it should be set
-            to 0 and pin_memory should be set to True.
-            pin_memory (bool, optional): [description]. Defaults to True. Use pinned memory
-            for allocating the dataset. Recommended when CUDA is used.
+            recommended to set this to 0.
+            Compare https://pytorch.org/docs/stable/data.html#single-and-multi-process-data-loading.
+            When using CUDA, it should be set to 0 and pin_memory should be set to True.
+            pin_memory (bool, optional): [description]. Defaults to True. Use pinned
+            memory for allocating the dataset. Recommended when CUDA is used.
         """
 
         super().__init__(
