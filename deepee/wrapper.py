@@ -87,6 +87,7 @@ class PrivacyWrapper(nn.Module):
         self._forward_succesful = False
         self._clip_succesful = False
         self._noise_succesful = False
+        self._privacy_spent = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if not self.training:
@@ -94,7 +95,8 @@ class PrivacyWrapper(nn.Module):
         else:  # in training mode
             if not self.num_replicas == x.shape[0]:
                 raise ValueError(
-                    f"num_replicas ({self.num_replicas}) must be equal to the batch size ({x.shape[0]})."
+                    f"num_replicas ({self.num_replicas}) must be equal to the"
+                    " batch size ({x.shape[0]})."
                 )
             y_pred = torch.nn.parallel.parallel_apply(
                 self.models, torch.stack(x.split(1))  # type: ignore
@@ -106,14 +108,22 @@ class PrivacyWrapper(nn.Module):
     def clip_and_accumulate(self) -> None:
         """Clips and averages the per-sample gradients.
         Raises:
-            RuntimeError: If no gradients have been calculated yet.
+            RuntimeError: If no gradients have been calculated yet
+            or the method was not called in order.
         """
+        if not self._forward_succesful:
+            raise RuntimeError(
+                "An error occured during model training. Please ascertain that the"
+                "model.forward(), model.clip_and_accumulate() and model.noise_gradient()"
+                " methods are called successfuly and in this order."
+            )
 
         for model in self.models:
             for param in model.parameters():
                 if param.requires_grad and param.grad is None:
                     raise RuntimeError(
-                        "No gradients have been calculated yet! This method should be called after .backward() was called on the loss."
+                        "No gradients have been calculated yet! This method should be"
+                        " called after .backward() was called on the loss."
                     )
 
         # Each model has seen one sample, hence we are "per-sample clipping" here.
@@ -138,7 +148,18 @@ class PrivacyWrapper(nn.Module):
 
     @torch.no_grad()
     def noise_gradient(self) -> None:
-        """Applies noise to the gradient before the optimizer step."""
+        """Applies noise to the gradient before the optimizer step.
+
+        Raises: RuntimeError if the method is not called in order.
+        """
+
+        if not self._clip_succesful:
+            raise RuntimeError(
+                "An error occured during model training. Please ascertain that the"
+                "model.forward(), model.clip_and_accumulate() and model.noise_gradient()"
+                " methods are called successfuly and in order."
+            )
+
         for param in self.wrapped_model.parameters():
             if param.requires_grad and hasattr(param, "accumulated_gradients"):
                 aggregated_gradient = torch.mean(param.accumulated_gradients, dim=0)
@@ -162,23 +183,39 @@ class PrivacyWrapper(nn.Module):
                 self._noise_succesful = True
 
     @torch.no_grad()
-    def prepare_next_batch(self) -> None:
+    def prepare_next_batch(
+        self, return_privacy_spent: Optional[bool] = False
+    ) -> Union[None, float]:
         """Prepare model for the next batch by re-initializing the model replicas with
         the updated weights and informing the PrivacyWatchdog about the state of the
         training.
+
+        Args:
+            return_privacy_spent (Optional[bool], optional): When set to True and a"
+            "PrivacyWatchDog is attached, it returns the epsilon (privacy spent) at"
+            "the specific report interval. Defaults to False.
+
+        Raises:
+            RuntimeError: If the method has not been called in proper order.
         """
-        for model in self.models:
-            model.load_state_dict(self.wrapped_model.state_dict())
         if not (
             self._forward_succesful and self._clip_succesful and self._noise_succesful
         ):
             raise RuntimeError(
-                "An error occured during model training. Please ascertain that the model.forward(), model.clip_and_accumulate() and model.noise_gradient() methods were called successfuly and in order."
+                "An error occured during model training. Please ascertain that the"
+                "model.forward(), model.clip_and_accumulate() and model.noise_gradient()"
+                " methods were called successfuly and in order."
             )
+        for model in self.models:
+            model.load_state_dict(self.wrapped_model.state_dict())
         self._steps_taken += 1
         self._forward_succesful = self._clip_succesful = self._noise_succesful = False
         if self.watchdog:
             self.watchdog.inform(self._steps_taken)
+
+        if return_privacy_spent:
+            return self._privacy_spent
+        return None  # just for you MyPy...
 
     @torch.no_grad()
     def _clone_model(self, model):
@@ -190,5 +227,6 @@ class PrivacyWrapper(nn.Module):
     @property
     def parameters(self):
         raise ValueError(
-            "The DPWrapper instance has no own parameters. Please use <Instance>.model.parameters()"
+            "The DPWrapper instance has no own parameters."
+            " Please use <Instance>.model.parameters()."
         )
