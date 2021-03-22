@@ -185,7 +185,7 @@ class PrivacyWrapper(nn.Module):
 
         for param in self.wrapped_model.parameters():
             if param.requires_grad and hasattr(param, "accumulated_gradients"):
-                aggregated_gradient = reduction(param.accumulated_gradients, dim=0)
+                aggregated_gradient = reduction(param.accumulated_gradients, dim=0)  # type: ignore
                 if not self.secure_rng:
                     if self.seed:
                         torch.manual_seed(self.seed)
@@ -202,7 +202,7 @@ class PrivacyWrapper(nn.Module):
                         generator=self.noise_gen,
                     )
                 param.grad = aggregated_gradient + noise
-                param.accumulated_gradients = None  # free memory
+                param.accumulated_gradients = None  # type: ignore
                 self._noise_succesful = True
 
     @torch.no_grad()

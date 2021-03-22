@@ -4,6 +4,7 @@ from torch import nn
 from deepee import ModelSurgeon, SurgicalProcedures
 from functools import partial
 import torch
+import pytest
 
 
 def test_bn_to_bn_nostats():
@@ -39,10 +40,10 @@ def test_bn_to_gn_default():
 
 def test_bn_to_gn_96():
     model = resnet18()
-    surgeon = ModelSurgeon(partial(SurgicalProcedures.BN_to_GN, num_groups=1))
+    surgeon = ModelSurgeon(partial(SurgicalProcedures.BN_to_GN, num_groups=96))
     converted_model = surgeon.operate(model)
     assert isinstance(converted_model.bn1, nn.modules.normalization.GroupNorm)
-    assert converted_model.bn1.num_groups == 1
+    assert converted_model.bn1.num_groups == 96
     wrapped = PrivacyWrapper(
         converted_model,
         2,
@@ -50,7 +51,8 @@ def test_bn_to_gn_96():
         1.0,
     )
     data = torch.rand(2, 3, 224, 224)
-    output = wrapped(data)
+    with pytest.raises(RuntimeError):
+        output = wrapped(data)
 
 
 def test_bn_to_in():
