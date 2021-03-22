@@ -3,8 +3,8 @@ from typing import Callable
 
 
 class BadModuleError(Exception):
-    """Informs the user that the module has some kinda problem.
-    """
+    """Informs the user that the module has some kinda problem."""
+
     pass
 
 
@@ -12,7 +12,7 @@ class ModelSnooper:
     def __init__(self) -> None:
         """The ModelSnooper checks the model for common problems in DP deep learning.
         In general, all layers which maintain state based on multiple samples from a batch
-        are not natively supported since the state is calculated non-privately.   
+        are not natively supported since the state is calculated non-privately.
         These include:
         - Having vanilla BatchNorm layers in the model unless the track_running_stats
         attribute is deactivated. In PyTorch, this turns them into InstanceNorm layers.
@@ -27,7 +27,8 @@ class ModelSnooper:
             Validator(
                 "BatchNorm Running Stats Off",
                 BN_running_stats_off,
-                "BatchNorm Layers must have track_running_stats turned off, otherwise be replaced with InstanceNorm, LayerNorm or GroupNorm. ",
+                "BatchNorm Layers must have track_running_stats turned off, otherwise be"
+                " replaced with InstanceNorm, LayerNorm or GroupNorm.",
             ),
         ]
 
@@ -91,4 +92,3 @@ def BN_running_stats_off(model: torch.nn.Module) -> bool:
             if module.track_running_stats:
                 return False
     return True
-
