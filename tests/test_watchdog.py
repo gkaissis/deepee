@@ -174,7 +174,7 @@ def test_wrapper_returns_epsilon():
     )
 
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0, watchdog=watchdog)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0, watchdog=watchdog)
     epsila = []  # this one's for you @a1302z
     for _ in range(5):
         output = wrapped(data)

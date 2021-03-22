@@ -32,7 +32,7 @@ def test_overfitting():
 
     dl = UniformDataLoader(DS(), batch_size=2)
 
-    model = PrivacyWrapper(Model, 2, 1.0, 1.0)
+    model = PrivacyWrapper(Model(), 2, 1.0, 1.0)
 
     optimizer = torch.optim.Adam(model.wrapped_model.parameters(), lr=4e-3)
 

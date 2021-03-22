@@ -13,19 +13,19 @@ class MiniModel(torch.nn.Module):
 
 
 def test_wrap():
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
 
 
 def test_forward():
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
     output = wrapped(data)
     assert output.shape == (2, 1, 1)
 
 
 def test_clip_accum():
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
     output = wrapped(data)
     loss = output.mean()
     loss.backward()
@@ -34,7 +34,7 @@ def test_clip_accum():
 
 def test_noise_insecure():
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0, secure_rng=False, seed=None)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0, secure_rng=False, seed=None)
     output = wrapped(data)
     loss = output.mean()
     loss.backward()
@@ -44,7 +44,7 @@ def test_noise_insecure():
 
 def test_noise_insecure_seed():
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0, secure_rng=False, seed=42)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0, secure_rng=False, seed=42)
     output = wrapped(data)
     loss = output.mean()
     loss.backward()
@@ -54,7 +54,7 @@ def test_noise_insecure_seed():
 
 def test_noise_secure():
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0, secure_rng=True)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0, secure_rng=True)
     output = wrapped(data)
     loss = output.mean()
     loss.backward()
@@ -64,7 +64,7 @@ def test_noise_secure():
 
 def test_noise_mean():
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1000, 1e-12, secure_rng=True)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1000, 1e-12, secure_rng=True)
     output = wrapped(data)
     loss = output.mean()
     loss.backward()
@@ -84,7 +84,7 @@ def test_noise_mean():
 
 def test_noise_sum():
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1000, 1e-12, secure_rng=True)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1000, 1e-12, secure_rng=True)
     output = wrapped(data)
     loss = output.mean()
     loss.backward()
@@ -104,7 +104,7 @@ def test_noise_sum():
 
 def test_raise_reduce_error():
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1000, 1e-12, secure_rng=True)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1000, 1e-12, secure_rng=True)
     output = wrapped(data)
     loss = output.mean()
     loss.backward()
@@ -115,7 +115,7 @@ def test_raise_reduce_error():
 
 def test_next_batch():
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
     output = wrapped(data)
     loss = output.mean()
     loss.backward()
@@ -131,7 +131,7 @@ def test_next_batch():
 
 def test_verification_and_steps_taken():
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
     assert wrapped._steps_taken == 0
     assert (
         wrapped._forward_succesful
@@ -156,7 +156,7 @@ def test_verification_and_steps_taken():
 
 def test_steps_taken():
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
     for _ in range(5):
         output = wrapped(data)
         loss = output.mean()
@@ -170,20 +170,20 @@ def test_steps_taken():
 def test_in_order():
     """Case 1: forward not called before clip"""
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
     with pytest.raises(RuntimeError):
         wrapped.clip_and_accumulate()
 
     """Case 2: clip not called before noise"""
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
     output = wrapped(data)
     with pytest.raises(RuntimeError):
         wrapped.noise_gradient()
 
     """Case 3: noise not called before prepare """
     data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
     output = wrapped(data)
     loss = output.mean()
     loss.backward()
@@ -193,13 +193,13 @@ def test_in_order():
 
 
 def test_raises_param_error():
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
     with pytest.raises(ValueError):
         params = wrapped.parameters()
 
 
 def test_check_device_cpu():
-    wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0).to("cpu")
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0).to("cpu")
     assert (
         next(
             iter(
@@ -217,7 +217,7 @@ def test_check_device_cpu():
 
 def test_check_device_gpu():
     if torch.cuda.is_available():
-        wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0).to("cuda")
+        wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0).to("cuda")
         assert "cuda" in next(
             iter(
                 set([param.device.type for param in wrapped.wrapped_model.parameters()])
@@ -233,4 +233,4 @@ def test_check_device_gpu():
 
 def test_raises_rng_collision():
     with pytest.raises(ValueError):
-        wrapped = PrivacyWrapper(MiniModel, 2, 1.0, 1.0, secure_rng=True, seed=42)
+        wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0, secure_rng=True, seed=42)

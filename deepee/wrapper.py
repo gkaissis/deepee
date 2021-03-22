@@ -17,7 +17,6 @@ class PrivacyWrapper(nn.Module):
         secure_rng: bool = False,
         seed: Optional[int] = None,
         watchdog: Optional[PrivacyWatchdog] = None,
-        **kwargs: Optional[Any],
     ) -> None:
         """Factory class which wraps any model and returns a model suitable for
         DP-SGD learning.
@@ -25,8 +24,7 @@ class PrivacyWrapper(nn.Module):
         forward and backward passes in parallel over the inputs.
 
         Args:
-            base_model (nn.Module): The model to wrap. Must be a class name, not a model
-            instance.
+            base_model (nn.Module): The model instalce to wrap.
             num_replicas (int): How many times to replicate the model. Must be set equal
             to the batch size.
             L2_clip (float): Clipping norm for the DP-SGD procedure.
@@ -69,7 +67,7 @@ class PrivacyWrapper(nn.Module):
         self.L2_clip = L2_clip
         self.noise_multiplier = noise_multiplier
         self.num_replicas = num_replicas
-        self.wrapped_model = base_model(**kwargs)
+        self.wrapped_model = base_model
         self.snooper = ModelSnooper()
         self.snooper.snoop(self.wrapped_model)
         del self.snooper  # snooped enough
@@ -270,8 +268,7 @@ class PerSampleGradientWrapper(nn.Module):
         If it throws an error, look to the ModelSurgeon to remedy these issues.
 
         Args:
-            base_model (nn.Module): The model to wrap. Must be a class name, not a model
-            instance.
+            base_model (nn.Module): The model instance to wrap.
             num_replicas (int): How many times to replicate the model. Must be set equal
             to the batch size.
 
@@ -285,7 +282,7 @@ class PerSampleGradientWrapper(nn.Module):
         """
         super().__init__()
         self.num_replicas = num_replicas
-        self.wrapped_model = base_model(**kwargs)
+        self.wrapped_model = base_model
         self.snooper = ModelSnooper()
         self.snooper.snoop(self.wrapped_model)
         del self.snooper

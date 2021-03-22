@@ -13,24 +13,24 @@ class MiniModel(torch.nn.Module):
 
 
 def test_wrap():
-    wrapped = PerSampleGradientWrapper(MiniModel, 2)
+    wrapped = PerSampleGradientWrapper(MiniModel(), 2)
 
 
 def test_forward():
     data = torch.randn(2, 1, 10)
-    wrapped = PerSampleGradientWrapper(MiniModel, 2)
+    wrapped = PerSampleGradientWrapper(MiniModel(), 2)
     output = wrapped(data)
     assert output.shape == (2, 1, 1)
 
 
 def test_raises_param_error():
-    wrapped = PerSampleGradientWrapper(MiniModel, 2)
+    wrapped = PerSampleGradientWrapper(MiniModel(), 2)
     with pytest.raises(ValueError):
         params = wrapped.parameters()
 
 
 def test_check_device_cpu():
-    wrapped = PerSampleGradientWrapper(MiniModel, 2).to("cpu")
+    wrapped = PerSampleGradientWrapper(MiniModel(), 2).to("cpu")
     assert (
         next(
             iter(
@@ -48,7 +48,7 @@ def test_check_device_cpu():
 
 def test_check_device_gpu():
     if torch.cuda.is_available():
-        wrapped = PerSampleGradientWrapper(MiniModel, 2).to("cuda")
+        wrapped = PerSampleGradientWrapper(MiniModel(), 2).to("cuda")
         assert "cuda" in next(
             iter(
                 set([param.device.type for param in wrapped.wrapped_model.parameters()])
@@ -66,7 +66,7 @@ def test_per_sample_grads():
     torch.manual_seed(42)
     data = torch.randn(2, 1, 10)
     torch.manual_seed(42)
-    wrapped = PerSampleGradientWrapper(MiniModel, 2)
+    wrapped = PerSampleGradientWrapper(MiniModel(), 2)
     torch.manual_seed(42)
     model = MiniModel()  # single copy
     output_single = model(data)
