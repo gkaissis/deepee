@@ -350,5 +350,5 @@ class PerSampleGradientWrapper(nn.Module):
     def parameters(self):
         raise ValueError(
             "The PerSampleGradientWrapper instance has no own parameters."
-            " Please use <Instance>.model.parameters()."
+            " Please use <Instance>.wrapped_model.parameters()."
         )
