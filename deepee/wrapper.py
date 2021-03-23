@@ -52,7 +52,8 @@ class PrivacyWrapper(nn.Module):
 
         Sample use:
 
-        >> model = PrivacyWrapper(resnet18, num_replicas=64, L2_clip=1., noise_multiplier=1.)
+        >> model = PrivacyWrapper(resnet18(), num_replicas=64, L2_clip=1.,
+                                 noise_multiplier=1.)
         >> optimizer = torch.optim.SGD(model.wrapped_model.parameters(), lr=0.1)
         >> y_pred = model(data)
         >> loss = criterion(y_pred, y_true)
@@ -105,7 +106,7 @@ class PrivacyWrapper(nn.Module):
             if not self.num_replicas == x.shape[0]:
                 raise ValueError(
                     f"num_replicas ({self.num_replicas}) must be equal to the"
-                    " batch size ({x.shape[0]})."
+                    f" batch size ({x.shape[0]})."
                 )
             try:
                 y_pred = torch.nn.parallel.parallel_apply(
@@ -118,14 +119,14 @@ class PrivacyWrapper(nn.Module):
                     raise RuntimeError(
                         "An error occured during the forward pass. "
                         " This is typical if using BatchNorm with a small image input size."
-                        " If this is the case, please switch to GroupNorm."
+                        " If this is the case, try switching to GroupNorm."
                     ) from e
                 else:
                     raise
 
     @torch.no_grad()
     def clip_and_accumulate(self, reduce: str = "mean") -> None:
-        """Clips and averages the per-sample gradients.
+        """Clips and aggregates the per-sample gradients.
 
         Args:
             reduce (str): How to reduce the accumulated gradients. As per the Abadi paper
@@ -242,9 +243,15 @@ class PrivacyWrapper(nn.Module):
         if self.watchdog:
             self.watchdog.inform(self._steps_taken)
 
-        if return_privacy_spent:
+        if not self.watchdog and return_privacy_spent:
+            raise RuntimeError(
+                "No PrivacyWatchdog is attached to the model. To return "
+                " privacy spent, please attach a watchdog."
+            )
+        elif self.watchdog and return_privacy_spent:
             return self._privacy_spent
-        return None  # just for you MyPy...
+        else:
+            return None  # just for you MyPy...
 
     @torch.no_grad()
     def _clone_model(self, model):
