@@ -9,7 +9,6 @@ from .watchdog import PrivacyWatchdog
 __all__ = [
     "PrivacyWrapper",
     "PerSampleGradientWrapper",
-    "ModelSnooper",
     "UniformDataLoader",
     "ModelSurgeon",
     "SurgicalProcedures",

@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from copy import deepcopy
+from copy import copy
 from typing import Optional, Any, Union
 
 from .snooper import ModelSnooper
@@ -107,11 +107,21 @@ class PrivacyWrapper(nn.Module):
                     f"num_replicas ({self.num_replicas}) must be equal to the"
                     " batch size ({x.shape[0]})."
                 )
-            y_pred = torch.nn.parallel.parallel_apply(
-                self.models, torch.stack(x.split(1))  # type: ignore
-            )
-            self._forward_succesful = True
-            return torch.cat(y_pred)
+            try:
+                y_pred = torch.nn.parallel.parallel_apply(
+                    self.models, torch.stack(x.split(1))  # type: ignore
+                )
+                self._forward_succesful = True
+                return torch.cat(y_pred)
+            except ValueError as e:
+                if "Expected more than 1 value per channel when training" in str(e):
+                    raise RuntimeError(
+                        "An error occured during the forward pass. "
+                        " This is typical if using BatchNorm with a small image input size."
+                        " If this is the case, please switch to GroupNorm."
+                    ) from e
+                else:
+                    raise
 
     @torch.no_grad()
     def clip_and_accumulate(self) -> None:
@@ -244,7 +254,7 @@ class PrivacyWrapper(nn.Module):
     def _clone_model(self, model):
         models = []
         for _ in range(self.num_replicas):
-            models.append(deepcopy(model))
+            models.append(copy(model))
         return nn.ModuleList(models)
 
     @property
@@ -343,7 +353,7 @@ class PerSampleGradientWrapper(nn.Module):
     def _clone_model(self, model):
         models = []
         for _ in range(self.num_replicas):
-            models.append(deepcopy(model))
+            models.append(copy(model))
         return nn.ModuleList(models)
 
     @property
