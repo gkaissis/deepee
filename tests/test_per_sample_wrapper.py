@@ -80,7 +80,7 @@ def test_per_sample_grads():
     single_grads = torch.cat([param.grad.flatten() for param in model.parameters()])
     accumulated_grads = torch.cat(
         [
-            param.accumulated_gradients.mean(dim=0).flatten()
+            param.accumulated_gradients.sum(dim=0).flatten()
             for param in wrapped.wrapped_model.parameters()
         ]
     )

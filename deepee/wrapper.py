@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from copy import copy
+from copy import deepcopy
 from typing import Optional, Any, Union
 
 from .snooper import ModelSnooper
@@ -124,12 +124,27 @@ class PrivacyWrapper(nn.Module):
                     raise
 
     @torch.no_grad()
-    def clip_and_accumulate(self) -> None:
+    def clip_and_accumulate(self, reduce: str = "mean") -> None:
         """Clips and averages the per-sample gradients.
+
+        Args:
+            reduce (str): How to reduce the accumulated gradients. As per the Abadi paper
+            this defaults to "mean". Alternatively, "sum" sums the per-sample gradients.
+
         Raises:
             RuntimeError: If no gradients have been calculated yet
             or the method was not called in order.
+
         """
+        if reduce == "mean":
+            reduction = torch.mean
+        elif reduce == "sum":
+            reduction = torch.sum
+        else:
+            raise ValueError(
+                f"'reduce' must be one of 'mean' or 'sum', got '{reduce}''."
+            )
+
         if not self._forward_succesful:
             raise RuntimeError(
                 "An error occured during model training. Please ascertain that the"
@@ -149,42 +164,22 @@ class PrivacyWrapper(nn.Module):
         for model in self.models:
             torch.nn.utils.clip_grad_norm_(model.parameters(), self.L2_clip)
 
-        model_grads = [
-            [param.grad for param in m.parameters() if param.requires_grad]
-            for m in self.models
-        ]  # a list of length = self.replicas which holds lists of parameter gradients
+        model_grads = zip(
+            *[
+                [param.grad for param in m.parameters() if param.requires_grad]
+                for m in self.models
+            ]
+        )
 
-        for param, gradient_source in zip(
-            self.wrapped_model.parameters(), zip(*model_grads)
-        ):
+        for param, gradient_source in zip(self.wrapped_model.parameters(), model_grads):
             if param.requires_grad:
-                setattr(
-                    param,
-                    "accumulated_gradients",
-                    torch.stack([grad for grad in gradient_source]),
-                )
+                param.grad = reduction(torch.stack(gradient_source), dim=0)
+
         self._clip_succesful = True
 
     @torch.no_grad()
-    def noise_gradient(self, reduce: str = "mean") -> None:
-        """Aggregates the gradient and applies noise before the optimizer step.
-
-        Args:
-            reduce (str): How to reduce the accumulated gradients. As per the Abadi paper
-            this defaults to "mean". Alternatively, "sum" sums the per-sample gradients.
-
-        Raises:
-            RuntimeError: [description]
-        """
-
-        if reduce == "mean":
-            reduction = torch.mean
-        elif reduce == "sum":
-            reduction = torch.sum
-        else:
-            raise ValueError(
-                f"'reduce' must be one of 'mean' or 'sum', got '{reduce}''."
-            )
+    def noise_gradient(self) -> None:
+        """Applies noise before the optimizer step."""
 
         if not self._clip_succesful:
             raise RuntimeError(
@@ -194,12 +189,11 @@ class PrivacyWrapper(nn.Module):
             )
 
         for param in self.wrapped_model.parameters():
-            if param.requires_grad and hasattr(param, "accumulated_gradients"):
-                aggregated_gradient = reduction(param.accumulated_gradients, dim=0)  # type: ignore
+            if param.requires_grad:
                 if not self.secure_rng:
                     if self.seed:
                         torch.manual_seed(self.seed)
-                    noise = torch.randn_like(aggregated_gradient) * (
+                    noise = torch.randn_like(param.grad) * (
                         self.L2_clip
                         * self.noise_multiplier
                         / self.num_replicas  # i.e. batch size
@@ -208,11 +202,10 @@ class PrivacyWrapper(nn.Module):
                     noise = torch.normal(
                         mean=0,
                         std=(self.L2_clip * self.noise_multiplier / self.num_replicas),
-                        size=aggregated_gradient.shape,
+                        size=param.grad.shape,
                         generator=self.noise_gen,
                     )
-                param.grad = aggregated_gradient + noise
-                param.accumulated_gradients = None  # type: ignore
+                param.grad.add_(noise)
                 self._noise_succesful = True
 
     @torch.no_grad()
@@ -240,7 +233,10 @@ class PrivacyWrapper(nn.Module):
                 " methods were called successfuly and in order."
             )
         for model in self.models:
-            model.load_state_dict(self.wrapped_model.state_dict())
+            for target_param, source_param in zip(
+                model.parameters(), self.wrapped_model.parameters()
+            ):
+                target_param.data = source_param.data
         self._steps_taken += 1
         self._forward_succesful = self._clip_succesful = self._noise_succesful = False
         if self.watchdog:
@@ -254,7 +250,11 @@ class PrivacyWrapper(nn.Module):
     def _clone_model(self, model):
         models = []
         for _ in range(self.num_replicas):
-            models.append(copy(model))
+            models.append(deepcopy(model))
+            for target_param, source_param in zip(
+                models[-1].parameters(), self.wrapped_model.parameters()
+            ):
+                target_param.data = source_param.data
         return nn.ModuleList(models)
 
     @property
@@ -334,26 +334,30 @@ class PerSampleGradientWrapper(nn.Module):
                         " called after .backward() was called on the loss."
                     )
 
-        model_grads = [
-            [param.grad for param in m.parameters() if param.requires_grad]
-            for m in self.models
-        ]  # a list of length = self.replicas which holds lists of parameter gradients
+        model_grads = zip(
+            *[
+                [param.grad for param in m.parameters() if param.requires_grad]
+                for m in self.models
+            ]
+        )  # a list of length = self.replicas which holds lists of parameter gradients
 
-        for param, gradient_source in zip(
-            self.wrapped_model.parameters(), zip(*model_grads)
-        ):
+        for param, gradient_source in zip(self.wrapped_model.parameters(), model_grads):
             if param.requires_grad:
                 setattr(
                     param,
                     "accumulated_gradients",
-                    torch.stack([grad for grad in gradient_source]),
+                    torch.stack(gradient_source),
                 )
 
     @torch.no_grad()
     def _clone_model(self, model):
         models = []
         for _ in range(self.num_replicas):
-            models.append(copy(model))
+            models.append(deepcopy(model))
+            for target_param, source_param in zip(
+                models[-1].parameters(), self.wrapped_model.parameters()
+            ):
+                target_param.data = source_param.data
         return nn.ModuleList(models)
 
     @property
