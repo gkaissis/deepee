@@ -22,6 +22,22 @@ def test_bn_to_bn_nostats():
     output = wrapped(data)
 
 
+def test_bn_to_bn_nostats_small_input():
+    model = resnet18()
+    surgeon = ModelSurgeon(SurgicalProcedures.BN_to_BN_nostats)
+    converted_model = surgeon.operate(model)
+    assert converted_model.bn1.track_running_stats == False
+    wrapped = PrivacyWrapper(
+        converted_model,
+        2,
+        1.0,
+        1.0,
+    )
+    data = torch.rand(2, 3, 32, 32)
+    with pytest.raises(RuntimeError):
+        output = wrapped(data)
+
+
 def test_bn_to_gn_default():
     model = resnet18()
     surgeon = ModelSurgeon(SurgicalProcedures.BN_to_GN)

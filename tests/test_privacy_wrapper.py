@@ -62,55 +62,14 @@ def test_noise_secure():
     wrapped.noise_gradient()
 
 
-def test_noise_mean():
-    data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel(), 2, 1000, 1e-12, secure_rng=True)
-    output = wrapped(data)
-    loss = output.mean()
-    loss.backward()
-    wrapped.clip_and_accumulate()
-    accumulated_grads_pre = torch.cat(
-        [
-            param.accumulated_gradients.mean(dim=0).flatten()
-            for param in wrapped.wrapped_model.parameters()
-        ]
-    )
-    wrapped.noise_gradient(reduce="mean")
-    grads_post = torch.cat(
-        [param.grad.flatten() for param in wrapped.wrapped_model.parameters()]
-    )
-    assert torch.allclose(accumulated_grads_pre, grads_post)
-
-
-def test_noise_sum():
-    data = torch.randn(2, 1, 10)
-    wrapped = PrivacyWrapper(MiniModel(), 2, 1000, 1e-12, secure_rng=True)
-    output = wrapped(data)
-    loss = output.mean()
-    loss.backward()
-    wrapped.clip_and_accumulate()
-    accumulated_grads_pre = torch.cat(
-        [
-            param.accumulated_gradients.sum(dim=0).flatten()
-            for param in wrapped.wrapped_model.parameters()
-        ]
-    )
-    wrapped.noise_gradient(reduce="sum")
-    grads_post = torch.cat(
-        [param.grad.flatten() for param in wrapped.wrapped_model.parameters()]
-    )
-    assert torch.allclose(accumulated_grads_pre, grads_post)
-
-
 def test_raise_reduce_error():
     data = torch.randn(2, 1, 10)
     wrapped = PrivacyWrapper(MiniModel(), 2, 1000, 1e-12, secure_rng=True)
     output = wrapped(data)
     loss = output.mean()
     loss.backward()
-    wrapped.clip_and_accumulate()
     with pytest.raises(ValueError):
-        wrapped.noise_gradient(reduce="foo")
+        wrapped.clip_and_accumulate(reduce="foo")
 
 
 def test_next_batch():
