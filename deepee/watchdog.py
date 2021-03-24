@@ -1,6 +1,7 @@
 from typing import Optional, Union
 import torch
 from torch import nn
+from torch._C import Value
 from torch.utils import data
 from torch.utils.data import DataLoader
 from pathlib import Path
@@ -24,8 +25,8 @@ class PrivacyWatchdog:
     def __init__(
         self,
         dataloader: Union[DataLoader, UniformDataLoader],
-        target_epsilon: Optional[float],
-        target_delta: Optional[float],
+        target_epsilon: float,
+        target_delta: float,
         report_every_n_steps: int = 100,
         abort: Optional[bool] = False,
         save: Optional[bool] = False,
@@ -39,9 +40,10 @@ class PrivacyWatchdog:
         aborting.
 
         Args:
-            target_epsilon (Optional[float]): The target epsilon to warn or abort
-            the training at.
-            target_delta (Optional[float]): The corresponding delta value.
+            target_epsilon (float): The target epsilon to warn or abort
+            the training at. Must be a positive float.
+            target_delta (float): The corresponding delta value. Must be positive
+            and between 0 and 1.
             report_every_n_steps (int, optional): Outputs the privacy spent to STDERR
             every n steps. Defaults to 100.
             abort (Optional[bool], optional): Whether to abort the training at the set
@@ -70,7 +72,11 @@ class PrivacyWatchdog:
                 " without replacement."
             )
         self.target_epsilon = target_epsilon
+        if self.target_epsilon is None or (not self.target_epsilon >= 0.0):  # type: ignore
+            raise ValueError("Epsilon must be a positive float.")
         self.target_delta = target_delta
+        if self.target_delta is None or (not (0 <= self.target_delta <= 1.0)):
+            raise ValueError("Delta must be between 0.0 and 1.0")
         self.report_every_n_steps = report_every_n_steps
         self.abort = abort
         self.save = save

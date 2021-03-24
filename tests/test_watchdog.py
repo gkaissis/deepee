@@ -30,6 +30,19 @@ def test_uniform_dl():
         assert "CRITICAL" and "replacement" in str(l)
 
 
+def test_epsilon_delta_positive():
+    with pytest.raises(ValueError):
+        watchdog = PrivacyWatchdog(udl, target_delta=1e-5, target_epsilon=None)
+    with pytest.raises(ValueError):
+        watchdog = PrivacyWatchdog(udl, target_delta=None, target_epsilon=1.0)
+    with pytest.raises(ValueError):
+        watchdog = PrivacyWatchdog(udl, target_delta=1.2, target_epsilon=1.0)
+    with pytest.raises(ValueError):
+        watchdog = PrivacyWatchdog(udl, target_delta=1.2, target_epsilon=1.0)
+    with pytest.raises(ValueError):
+        watchdog = PrivacyWatchdog(udl, target_delta=1e-5, target_epsilon=-4)
+
+
 def test_warn_without_save_or_path():
     with LogCapture() as l:
         watchdog = PrivacyWatchdog(
