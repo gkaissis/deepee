@@ -100,6 +100,17 @@ class PrivacyWrapper(nn.Module):
         self._privacy_spent = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if not (
+            self._forward_succesful
+            == self._clip_succesful
+            == self._noise_succesful
+            == False
+        ):
+            raise RuntimeError(
+                "An error occured during model training. The model.forward() method must "
+                " be called after model.clip_and_accumulate(), model.noise_gradient() and "
+                " model.prepare_next_batch()."
+            )
         if not self.training:
             return self.wrapped_model(x)
         else:  # in training mode
@@ -148,9 +159,9 @@ class PrivacyWrapper(nn.Module):
 
         if not self._forward_succesful:
             raise RuntimeError(
-                "An error occured during model training. Please ascertain that the"
-                "model.forward(), model.clip_and_accumulate() and model.noise_gradient()"
-                " methods are called successfuly and in this order."
+                "An error occured during model training. The model.clip_and_accumulate() "
+                " method must be called after model.forward() and before model.noise_gradient() "
+                " and model.prepare_next_batch() were called."
             )
 
         for model in self.models:
@@ -184,9 +195,9 @@ class PrivacyWrapper(nn.Module):
 
         if not self._clip_succesful:
             raise RuntimeError(
-                "An error occured during model training. Please ascertain that the"
-                "model.forward(), model.clip_and_accumulate() and model.noise_gradient()"
-                " methods are called successfuly and in order."
+                "An error occured during model training. The model.noise_gradient() method"
+                " must be called after the model.forward() and model.clip_and_accumulate() "
+                " methods and before model.prepare_next_batch()."
             )
 
         for param in self.wrapped_model.parameters():
@@ -229,9 +240,9 @@ class PrivacyWrapper(nn.Module):
             self._forward_succesful and self._clip_succesful and self._noise_succesful
         ):
             raise RuntimeError(
-                "An error occured during model training. Please ascertain that the"
-                "model.forward(), model.clip_and_accumulate() and model.noise_gradient()"
-                " methods were called successfuly and in order."
+                "An error occured during model training. The model.prepare_next_batch() "
+                " method must be called after model.forward(), model.clip_and_accumulate() "
+                " and model.noise_gradient()."
             )
         for model in self.models:
             for target_param, source_param in zip(
@@ -329,8 +340,8 @@ class PerSampleGradientWrapper(nn.Module):
         """
         if not self._forward_succesful:
             raise RuntimeError(
-                "An error occured during model training. Please ascertain that the "
-                "model.forward() method was called before calculating per sample gradients"
+                "An error occured during model training. Please ascertain that the"
+                " model.forward() method was called before calculating per sample gradients"
             )
 
         for model in self.models:

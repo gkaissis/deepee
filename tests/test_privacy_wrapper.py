@@ -150,6 +150,17 @@ def test_in_order():
     with pytest.raises(RuntimeError):
         wrapped.prepare_next_batch()
 
+    """Case 3: forward called without prepare """
+    data = torch.randn(2, 1, 10)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
+    output = wrapped(data)
+    loss = output.mean()
+    loss.backward()
+    wrapped.clip_and_accumulate()
+    wrapped.noise_gradient()
+    with pytest.raises(RuntimeError):
+        output = wrapped(data)
+
 
 def test_raises_param_error():
     wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
