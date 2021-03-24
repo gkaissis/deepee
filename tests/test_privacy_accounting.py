@@ -13,5 +13,5 @@ def test_epsilon_float():
 
 
 def test_implausible_values():
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ValueError):
         compute_eps_uniform(1, 0.001, 60_000, 200, 1e-5)

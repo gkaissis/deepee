@@ -185,3 +185,113 @@ def test_wrapper_returns_epsilon():
         epsilon = wrapped.prepare_next_batch(return_privacy_spent=True)
         epsila.append(epsilon)
     assert len(epsila) == 5
+
+
+def test_fallback_warning():
+    class MiniModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = torch.nn.Linear(10, 1)
+
+        def forward(self, x):
+            return self.lin(x)
+
+    class BigDS(Dataset):
+        def __getitem__(self, idx):
+            return torch.rand(
+                1,
+            )
+
+        def __len__(self):
+            return 50_000
+
+    dl = UniformDataLoader(BigDS(), batch_size=200)
+    with LogCapture() as l:
+        watchdog = PrivacyWatchdog(
+            dl,
+            report_every_n_steps=1,
+            target_delta=1e-5,
+            target_epsilon=1.0,
+            abort=False,
+            fallback_to_rdp=True,
+        )
+        assert "CRITICAL" and "RDP" in str(l)
+
+
+def test_fallback_works():
+    class MiniModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = torch.nn.Linear(10, 1)
+
+        def forward(self, x):
+            return self.lin(x)
+
+    class BigDS(Dataset):
+        def __getitem__(self, idx):
+            return torch.rand(
+                1,
+            )
+
+        def __len__(self):
+            return 50_000
+
+    dl = UniformDataLoader(BigDS(), batch_size=200)
+    watchdog = PrivacyWatchdog(
+        dl,
+        report_every_n_steps=1,
+        target_delta=1e-5,
+        target_epsilon=1.0,
+        abort=False,
+        fallback_to_rdp=True,
+    )
+    data = torch.randn(2, 1, 10)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 10, 0.001, watchdog=watchdog)
+    epsila = []  # this one's for you @a1302z
+    for _ in range(5):
+        output = wrapped(data)
+        loss = output.mean()
+        loss.backward()
+        wrapped.clip_and_accumulate()
+        wrapped.noise_gradient()
+        epsilon = wrapped.prepare_next_batch(return_privacy_spent=True)
+        epsila.append(epsilon)
+    assert len(epsila) == 5
+
+
+def test_no_fallback_crashes():
+    class MiniModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = torch.nn.Linear(10, 1)
+
+        def forward(self, x):
+            return self.lin(x)
+
+    class BigDS(Dataset):
+        def __getitem__(self, idx):
+            return torch.rand(
+                1,
+            )
+
+        def __len__(self):
+            return 50_000
+
+    dl = UniformDataLoader(BigDS(), batch_size=200)
+    watchdog = PrivacyWatchdog(
+        dl,
+        report_every_n_steps=1,
+        target_delta=1e-5,
+        target_epsilon=1.0,
+        abort=False,
+        fallback_to_rdp=False,
+    )
+    data = torch.randn(2, 1, 10)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 10, 0.001, watchdog=watchdog)
+    with pytest.raises(RuntimeError):
+        output = wrapped(data)
+        loss = output.mean()
+        loss.backward()
+        wrapped.clip_and_accumulate()
+        wrapped.noise_gradient()
+        wrapped.prepare_next_batch(return_privacy_spent=False)
