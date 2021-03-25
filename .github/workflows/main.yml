@@ -30,7 +30,7 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: install dependencies
-        run: conda env create -f environment.yml --yes && conda activate deepee2
+        run: conda env create -f environment.yml && conda activate deepee2
         
       - name: run pytest
         run: python -m pytest .
