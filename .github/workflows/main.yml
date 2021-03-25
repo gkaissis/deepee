@@ -27,10 +27,9 @@ jobs:
       
       - name: setup-conda
         uses: s-weigand/setup-conda@v1.0.5
+        with:
+          python-version: 3.7
 
       # Runs a single command using the runners shell
-      - name: install dependencies
-        run: conda env create -f CI_env.yml && source activate CI
-        
-      - name: run pytest
-        run: source activate CI && pytest.
+      - name: install dependencies & run
+        run: conda install pip pytorch torchvision scipy torchcsprng pytest -c conda-forge -c pytorch --yes && pip install testfixtures && pytest .
