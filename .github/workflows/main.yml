@@ -33,4 +33,4 @@ jobs:
         run: conda env create -f CI_env.yml && source activate CI
         
       - name: run pytest
-        run: python3 -m pytest .
+        run: source activate CI && pytest.
