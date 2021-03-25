@@ -221,9 +221,7 @@ class PrivacyWrapper(nn.Module):
                 self._noise_succesful = True
 
     @torch.no_grad()
-    def prepare_next_batch(
-        self, return_privacy_spent: Optional[bool] = False
-    ) -> Union[None, float]:
+    def prepare_next_batch(self) -> None:
         """Prepare model for the next batch by re-initializing the model replicas with
         the updated weights and informing the PrivacyWatchdog about the state of the
         training.
@@ -252,17 +250,7 @@ class PrivacyWrapper(nn.Module):
         self._steps_taken += 1
         self._forward_succesful = self._clip_succesful = self._noise_succesful = False
         if self.watchdog:
-            self.watchdog.inform(self._steps_taken)
-
-        if not self.watchdog and return_privacy_spent:
-            raise RuntimeError(
-                "No PrivacyWatchdog is attached to the model. To return "
-                " privacy spent, please attach a watchdog."
-            )
-        elif self.watchdog and return_privacy_spent:
-            return self._privacy_spent
-        else:
-            return None  # just for you MyPy...
+            self._privacy_spent = self.watchdog.inform(self._steps_taken)
 
     @torch.no_grad()
     def _clone_model(self, model):
@@ -281,6 +269,12 @@ class PrivacyWrapper(nn.Module):
             "The PrivacyWrapper instance has no own parameters."
             " Please use <Instance>.model.parameters()."
         )
+
+    @property
+    def current_epsilon(self):
+        if self.watchdog is None:
+            raise ValueError("No watchdog to calculate epsilon")
+        return self.watchdog.calc_epsilon(self._steps_taken)
 
 
 class PerSampleGradientWrapper(nn.Module):
