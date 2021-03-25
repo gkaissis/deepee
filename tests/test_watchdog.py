@@ -195,7 +195,7 @@ def test_wrapper_returns_epsilon():
         loss.backward()
         wrapped.clip_and_accumulate()
         wrapped.noise_gradient()
-        epsilon = wrapped.prepare_next_batch(return_privacy_spent=True)
+        epsilon = wrapped.prepare_next_batch()
         epsila.append(epsilon)
     assert len(epsila) == 5
 
@@ -267,7 +267,7 @@ def test_fallback_works():
         loss.backward()
         wrapped.clip_and_accumulate()
         wrapped.noise_gradient()
-        epsilon = wrapped.prepare_next_batch(return_privacy_spent=True)
+        epsilon = wrapped.prepare_next_batch()
         epsila.append(epsilon)
     assert len(epsila) == 5
 
@@ -307,4 +307,4 @@ def test_no_fallback_crashes():
         loss.backward()
         wrapped.clip_and_accumulate()
         wrapped.noise_gradient()
-        wrapped.prepare_next_batch(return_privacy_spent=False)
+        wrapped.prepare_next_batch()
