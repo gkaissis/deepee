@@ -273,13 +273,17 @@ class PrivacyWrapper(nn.Module):
     @property
     def current_epsilon(self):
         if self.watchdog is None:
-            raise ValueError("No watchdog to calculate epsilon")
+            raise ValueError(
+                "To calculate epsilon, a PrivacyWatchdog must be attached."
+            )
         return self.watchdog.calc_epsilon(self._steps_taken)
 
 
 class PerSampleGradientWrapper(nn.Module):
     def __init__(
-        self, base_model: nn.Module, num_replicas: int, **kwargs: Optional[Any]
+        self,
+        base_model: nn.Module,
+        num_replicas: int,
     ) -> None:
         """Factory class which wraps a PyTorch model to provide access to per-sample
         gradients. It will replicate the base model and peform the forward and backward
