@@ -204,3 +204,25 @@ def test_check_device_gpu():
 def test_raises_rng_collision():
     with pytest.raises(ValueError):
         wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0, secure_rng=True, seed=42)
+
+
+def test_transfer_learning():
+    """Some model parameters do not require gradients"""
+
+    class MiniModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = torch.nn.Linear(10, 1)
+            list(self.lin.parameters())[0].requires_grad_(False)
+
+        def forward(self, x):
+            return self.lin(x)
+
+    data = torch.randn(2, 1, 10)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
+    output = wrapped(data)
+    loss = output.mean()
+    loss.backward()
+    wrapped.clip_and_accumulate()
+    wrapped.noise_gradient()
+    wrapped.prepare_next_batch()

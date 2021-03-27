@@ -85,3 +85,41 @@ def test_per_sample_grads():
         ]
     )
     assert torch.allclose(single_grads, accumulated_grads)
+
+
+def test_per_sample_grads_transfer_learning():
+    class MiniModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = torch.nn.Linear(10, 1)
+            list(self.lin.parameters())[0].requires_grad_(False)
+
+        def forward(self, x):
+            return self.lin(x)
+
+    "One model parameter does not requires_grad"
+    torch.manual_seed(42)
+    data = torch.randn(2, 1, 10)
+    torch.manual_seed(42)
+    wrapped = PerSampleGradientWrapper(MiniModel(), 2)
+    torch.manual_seed(42)
+    model = MiniModel()  # single copy
+    output_single = model(data)
+    output_wrapped = wrapped(data)
+    loss_single = output_single.mean()
+    loss_wrapped = output_wrapped.mean()
+
+    loss_single.backward()
+    loss_wrapped.backward()
+    wrapped.calculate_per_sample_gradients()
+    single_grads = torch.cat(
+        [param.grad.flatten() for param in model.parameters() if param.requires_grad]
+    )
+    accumulated_grads = torch.cat(
+        [
+            param.accumulated_gradients.sum(dim=0).flatten()
+            for param in wrapped.wrapped_model.parameters()
+            if hasattr(param, "accumulated_gradients")
+        ]
+    )
+    assert torch.allclose(single_grads, accumulated_grads)

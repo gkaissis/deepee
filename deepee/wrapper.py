@@ -183,7 +183,10 @@ class PrivacyWrapper(nn.Module):
             ]
         )
 
-        for param, gradient_source in zip(self.wrapped_model.parameters(), model_grads):
+        for param, gradient_source in zip(
+            [param for param in self.wrapped_model.parameters() if param.requires_grad],
+            model_grads,
+        ):
             if param.requires_grad:
                 param.grad = reduction(torch.stack(gradient_source), dim=0)
 
@@ -250,7 +253,7 @@ class PrivacyWrapper(nn.Module):
         self._steps_taken += 1
         self._forward_succesful = self._clip_succesful = self._noise_succesful = False
         if self.watchdog:
-            self._privacy_spent = self.watchdog.inform(self._steps_taken)
+            self.watchdog.inform(self._steps_taken)
 
     @torch.no_grad()
     def _clone_model(self, model):
@@ -299,8 +302,8 @@ class PerSampleGradientWrapper(nn.Module):
             to the batch size.
 
         Sample use:
-        >> model = PrivacyWrapper(resnet18, num_replicas=64)
-        >> optimizer = torch.optim.SGD(model.model.parameters(), lr=0.1)
+        >> model = PerSampleGradientWrapper(resnet18, num_replicas=64)
+        >> optimizer = torch.optim.SGD(model.wrapped_model.parameters(), lr=0.1)
         >> y_pred = model(data)
         >> loss = criterion(y_pred, y_true)
         >> loss.backward()
@@ -323,13 +326,23 @@ class PerSampleGradientWrapper(nn.Module):
             if not self.num_replicas == x.shape[0]:
                 raise ValueError(
                     f"num_replicas ({self.num_replicas}) must be equal to the"
-                    " batch size ({x.shape[0]})."
+                    f" batch size ({x.shape[0]})."
                 )
-            y_pred = torch.nn.parallel.parallel_apply(
-                self.models, torch.stack(x.split(1))  # type: ignore
-            )
-            self._forward_succesful = True
-            return torch.cat(y_pred)
+            try:
+                y_pred = torch.nn.parallel.parallel_apply(
+                    self.models, torch.stack(x.split(1))  # type: ignore
+                )
+                self._forward_succesful = True
+                return torch.cat(y_pred)
+            except ValueError as e:
+                if "Expected more than 1 value per channel when training" in str(e):
+                    raise RuntimeError(
+                        "An error occured during the forward pass. "
+                        " This is typical if using BatchNorm with a small image input size."
+                        " If this is the case, try switching to GroupNorm."
+                    ) from e
+                else:
+                    raise
 
     def calculate_per_sample_gradients(self):
         """Calculates per-sample gradients for each sample in the minibatch and stores
@@ -357,7 +370,10 @@ class PerSampleGradientWrapper(nn.Module):
             ]
         )  # a list of length = self.replicas which holds lists of parameter gradients
 
-        for param, gradient_source in zip(self.wrapped_model.parameters(), model_grads):
+        for param, gradient_source in zip(
+            [param for param in self.wrapped_model.parameters() if param.requires_grad],
+            model_grads,
+        ):
             if param.requires_grad:
                 setattr(
                     param,

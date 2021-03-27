@@ -195,9 +195,9 @@ def test_wrapper_returns_epsilon():
         loss.backward()
         wrapped.clip_and_accumulate()
         wrapped.noise_gradient()
-        epsilon = wrapped.prepare_next_batch()
-        epsila.append(epsilon)
-    assert len(epsila) == 5
+        wrapped.prepare_next_batch()
+        epsila.append(wrapped.current_epsilon)
+    assert len(epsila) == 5 and None not in epsila
 
 
 def test_fallback_warning():
