@@ -13,6 +13,7 @@ dependencies:
   - pytest
   - mypy
   - black
-pip:
-  - testfixtures
+  - pip
+  - pip:
+    - testfixtures
 

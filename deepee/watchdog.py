@@ -100,7 +100,7 @@ class PrivacyWatchdog:
         if (self.abort and self.save) and not self.path:
             raise ValueError("When setting 'save', a path to save to must be provided.")
 
-    def inform(self, steps_taken: int) -> None:
+    def calc_epsilon(self, steps_taken: int) -> float:
         if not self.wrapper:
             raise RuntimeError("WatchDog must be attached to a PrivacyWrapper.")
         batch_size = (
@@ -138,10 +138,12 @@ class PrivacyWatchdog:
                     " 'disable' DP by setting these values, errors can be avoided by not"
                     " attaching a WatchDog to your PrivacyWrapper."
                 ) from e
+        return spent
 
+    def inform(self, steps_taken: int) -> None:
+        spent = self.calc_epsilon(steps_taken)
         if steps_taken % self.report_every_n_steps == 0:
             logging.info(f"Privacy spent at {steps_taken} steps: {spent:.2f}")
-            setattr(self.wrapper, "_privacy_spent", spent)
 
         if spent >= self.target_epsilon:  # type: ignore
             if self.abort:  # type: ignore
