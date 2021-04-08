@@ -11,7 +11,7 @@ class args:
     test_batch_size = 200
     log_interval = 1000
     num_epochs = 5
-    device = "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 train_loader = UniformDataLoader(
@@ -102,13 +102,13 @@ class SimpleNet(nn.Module):
 
 watchdog = PrivacyWatchdog(
     train_loader,
-    target_epsilon=500,
-    abort=True,
+    target_epsilon=1.0,
+    abort=False,
     target_delta=1e-5,
-    fallback_to_rdp=True,
+    fallback_to_rdp=False,
 )
 
-model = PrivacyWrapper(SimpleNet(), args.batch_size, 2, 0.2, watchdog=watchdog).to(
+model = PrivacyWrapper(SimpleNet(), args.batch_size, 1.0, 1.0, watchdog=watchdog).to(
     args.device
 )
 optimizer = torch.optim.SGD(model.wrapped_model.parameters(), lr=0.1)

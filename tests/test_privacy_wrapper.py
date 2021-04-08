@@ -7,9 +7,10 @@ class MiniModel(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.lin = torch.nn.Linear(10, 1)
+        self.lin2 = torch.nn.Linear(1, 1)
 
     def forward(self, x):
-        return self.lin(x)
+        return self.lin2(self.lin(x))
 
 
 def test_wrap():
@@ -162,10 +163,63 @@ def test_in_order():
         output = wrapped(data)
 
 
-def test_raises_param_error():
+def test_parameters():
+    m = MiniModel()
+    for param in m.lin2.parameters():
+        param.requires_grad = False
+    wrapped = PrivacyWrapper(m, 2, 1.0, 1.0)
+    optim = torch.optim.SGD(wrapped.parameters(), lr=1)
+    params = wrapped.parameters()
+    assert all([a.shape == b.shape for a, b in zip(params, MiniModel().parameters())])
+    data = torch.randn(2, 1, 10)
+    optim.zero_grad()
+    output = wrapped(data)
+    loss = output.mean()
+    loss.backward()
+    wrapped.clip_and_accumulate()
+    wrapped.noise_gradient()
+    optim.step()
+    wrapped.prepare_next_batch()
+    for param in wrapped.wrapped_model.parameters():
+        param.requires_grad = True
+    optim.zero_grad()
+    data = torch.randn(2, 1, 10)
+    output = wrapped(data)
+    loss = output.mean()
+    loss.backward()
+    with pytest.raises(RuntimeError):
+        wrapped.clip_and_accumulate()
+
+    # same procedure as last year miss sophie?
+    m = MiniModel()
+    for param in m.lin2.parameters():
+        param.requires_grad = False
+    wrapped = PrivacyWrapper(m, 2, 1.0, 1.0)
+    optim = torch.optim.SGD(wrapped.parameters(), lr=1)
+    params = wrapped.parameters()
+    assert all([a.shape == b.shape for a, b in zip(params, MiniModel().parameters())])
+    data = torch.randn(2, 1, 10)
+    optim.zero_grad()
+    output = wrapped(data)
+    loss = output.mean()
+    loss.backward()
+    wrapped.clip_and_accumulate()
+    wrapped.noise_gradient()
+    optim.step()
+    wrapped.prepare_next_batch()
+    for param in wrapped.wrapped_model.parameters():
+        param.requires_grad = True
+    wrapped.update_clones()
+    optim.zero_grad()
+    data = torch.randn(2, 1, 10)
+    output = wrapped(data)
+    loss = output.mean()
+    loss.backward()
+    wrapped.clip_and_accumulate()
+
+
+def test_update_error():
     wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
-    with pytest.raises(ValueError):
-        params = wrapped.parameters()
 
 
 def test_check_device_cpu():
@@ -204,3 +258,25 @@ def test_check_device_gpu():
 def test_raises_rng_collision():
     with pytest.raises(ValueError):
         wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0, secure_rng=True, seed=42)
+
+
+def test_transfer_learning():
+    """Some model parameters do not require gradients"""
+
+    class MiniModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = torch.nn.Linear(10, 1)
+            list(self.lin.parameters())[0].requires_grad_(False)
+
+        def forward(self, x):
+            return self.lin(x)
+
+    data = torch.randn(2, 1, 10)
+    wrapped = PrivacyWrapper(MiniModel(), 2, 1.0, 1.0)
+    output = wrapped(data)
+    loss = output.mean()
+    loss.backward()
+    wrapped.clip_and_accumulate()
+    wrapped.noise_gradient()
+    wrapped.prepare_next_batch()
