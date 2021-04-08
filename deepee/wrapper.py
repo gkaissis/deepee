@@ -176,19 +176,39 @@ class PrivacyWrapper(nn.Module):
         for model in self.models:
             torch.nn.utils.clip_grad_norm_(model.parameters(), self.L2_clip)
 
-        model_grads = zip(
-            *[
-                [param.grad for param in m.parameters() if param.requires_grad]
-                for m in self.models
-            ]
-        )
+        clone_grads = [
+            [param.grad for param in m.parameters() if param.requires_grad]
+            for m in self.models
+        ]
+        clone_lens = [len(c) for c in clone_grads]
+        model_grads = zip(*clone_grads)
 
-        for param, gradient_source in zip(
-            [param for param in self.wrapped_model.parameters() if param.requires_grad],
-            model_grads,
-        ):
-            if param.requires_grad:
-                param.grad = reduction(torch.stack(gradient_source), dim=0)
+        try:
+            wrapped_grads = [
+                param
+                for param in self.wrapped_model.parameters()
+                if param.requires_grad
+            ]
+            L = len(wrapped_grads)
+            if any([L != c for c in clone_lens]):
+                raise RuntimeError(
+                    "Clone grads and wrapped grads have different size. "
+                    "Did you change the model without calling update_clones()?"
+                )
+            for param, gradient_source in zip(
+                wrapped_grads,
+                model_grads,
+            ):
+                if param.requires_grad:
+                    param.grad = reduction(torch.stack(gradient_source), dim=0)
+        except RuntimeError as e:
+            if "assigned grad has data of a different size" in str(e):
+                raise RuntimeError(
+                    "Grads of wrapped model and clones are not matching. "
+                    "Did you change the model without calling update_clones()?"
+                ) from e
+            else:
+                raise e
 
         self._clip_succesful = True
 
@@ -266,12 +286,15 @@ class PrivacyWrapper(nn.Module):
                 target_param.data = source_param.data
         return nn.ModuleList(models)
 
-    @property
     def parameters(self):
-        raise ValueError(
-            "The PrivacyWrapper instance has no own parameters."
-            " Please use <Instance>.model.parameters()."
-        )
+        # raise ValueError(
+        #     "The PrivacyWrapper instance has no own parameters."
+        #     " Please use <Instance>.model.parameters()."
+        # )
+        return self.wrapped_model.parameters()
+
+    def update_clones(self):
+        self.models = self._clone_model(self.wrapped_model)
 
     @property
     def current_epsilon(self):
