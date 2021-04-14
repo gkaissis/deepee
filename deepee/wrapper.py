@@ -100,6 +100,8 @@ class PrivacyWrapper(nn.Module):
         self._privacy_spent = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if not self.training:
+            return self.wrapped_model(x)
         if not (
             self._forward_succesful
             == self._clip_succesful
@@ -111,8 +113,6 @@ class PrivacyWrapper(nn.Module):
                 " be called after model.clip_and_accumulate(), model.noise_gradient() and "
                 " model.prepare_next_batch()."
             )
-        if not self.training:
-            return self.wrapped_model(x)
         else:  # in training mode
             if not self.num_replicas == x.shape[0]:
                 raise ValueError(
@@ -195,10 +195,7 @@ class PrivacyWrapper(nn.Module):
                     "Clone grads and wrapped grads have different size. "
                     "Did you change the model without calling update_clones()?"
                 )
-            for param, gradient_source in zip(
-                wrapped_grads,
-                model_grads,
-            ):
+            for param, gradient_source in zip(wrapped_grads, model_grads,):
                 if param.requires_grad:
                     param.grad = reduction(torch.stack(gradient_source), dim=0)
         except RuntimeError as e:
@@ -306,11 +303,7 @@ class PrivacyWrapper(nn.Module):
 
 
 class PerSampleGradientWrapper(nn.Module):
-    def __init__(
-        self,
-        base_model: nn.Module,
-        num_replicas: int,
-    ) -> None:
+    def __init__(self, base_model: nn.Module, num_replicas: int,) -> None:
         """Factory class which wraps a PyTorch model to provide access to per-sample
         gradients. It will replicate the base model and peform the forward and backward
         passes in parallel. Contrary to the PrivacyWrapper, this class doesn't offer any
@@ -399,9 +392,7 @@ class PerSampleGradientWrapper(nn.Module):
         ):
             if param.requires_grad:
                 setattr(
-                    param,
-                    "accumulated_gradients",
-                    torch.stack(gradient_source),
+                    param, "accumulated_gradients", torch.stack(gradient_source),
                 )
 
     @torch.no_grad()

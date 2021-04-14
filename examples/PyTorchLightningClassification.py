@@ -220,7 +220,6 @@ class PrivatePLClassifier(pl.LightningModule):
 privateclassifier = PrivatePLClassifier()
 privatetrainer = pl.Trainer(
     max_epochs=args.num_epochs,
-    weights_summary=None,
     gpus=1 if torch.cuda.is_available() else 0,
 )
 try:

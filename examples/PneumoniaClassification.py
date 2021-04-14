@@ -14,11 +14,25 @@ from tqdm import tqdm
 from deepee import UniformDataLoader
 
 # %%
+from random import seed
+from numpy.random import seed as npseed
+
+# from os import environ
+
+# environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
+
+seed(42)
+npseed(42)
+torch.manual_seed(42)
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True
+# torch.use_deterministic_algorithms(True)
+# %%
 class args:
     batch_size = 32
-    test_batch_size = 200
-    lr = 1e-3
-    num_epochs = 5
+    test_batch_size = 700
+    lr = 1e-4
+    num_epochs = 20
     log_interval = 100
 
 
@@ -90,7 +104,7 @@ valloader = torch.utils.data.DataLoader(
 )
 testloader = torch.utils.data.DataLoader(
     testset,
-    batch_size=args.batch_size,
+    batch_size=args.test_batch_size,
     pin_memory=torch.cuda.is_available(),
     num_workers=0 if torch.cuda.is_available() else 32,
     shuffle=True,
@@ -127,17 +141,18 @@ logger = pl.loggers.TensorBoardLogger("logs", name="pneumonia_classification")
 
 # %%
 class PLClassifier(pl.LightningModule):
-    def __init__(self, class_weights):
+    def __init__(self, class_weights, is_super=False):
         super().__init__()
-        self.classifier = tv.models.resnet18(pretrained=True)
-        for param in self.classifier.parameters():
-            param.requires_grad = False
-        self.classifier.fc = torch.nn.Linear(512, 1)
-        for param in self.classifier.fc.parameters():
-            param.requires_grad = True
-        self.loss_fn = torch.nn.functional.binary_cross_entropy_with_logits
-        self.weight = class_weights
-        surgeon.operate(self.classifier)  # for comparison reasons
+        if not is_super:
+            self.classifier = tv.models.vgg11_bn(pretrained=True)
+            self.classifier.classifier = torch.nn.Linear(512 * 7 * 7, 1)
+            for param in self.classifier.parameters():
+                param.requires_grad = False
+            for param in self.classifier.classifier.parameters():
+                param.requires_grad = True
+            self.loss_fn = torch.nn.functional.binary_cross_entropy_with_logits
+            self.weight = class_weights
+            surgeon.operate(self.classifier)  # for comparison reasons
 
     def forward(self, x):
         embedding = self.classifier(x)
@@ -161,7 +176,7 @@ class PLClassifier(pl.LightningModule):
         data, target = batch
         pred = self.classifier(data).squeeze()
         loss = self.loss_fn(pred, target.to(torch.float))
-        pred = pred.detach().cpu()
+        pred = torch.sigmoid(pred.detach().cpu())
         pred_classes = torch.where(pred < 0.5, 0, 1).tolist()
         target = target.cpu().detach().tolist()
         mcc = metrics.matthews_corrcoef(target, pred_classes)
@@ -177,7 +192,7 @@ class PLClassifier(pl.LightningModule):
         target = target
         pred = self.classifier(data).squeeze()
         loss = self.loss_fn(pred, target.to(torch.float))
-        pred = pred.detach().cpu()
+        pred = torch.sigmoid(pred.detach().cpu())
         pred_classes = torch.where(pred < 0.5, 0, 1).tolist()
         target = target.cpu().detach().tolist()
         mcc = metrics.matthews_corrcoef(target, pred_classes)
@@ -200,7 +215,7 @@ class PLClassifier(pl.LightningModule):
     def on_epoch_start(self):
         if self.current_epoch == 1:
             print("Unfreeze normalization layers")
-            for layer_name, layer in self.classifier.wrapped_model.named_modules():
+            for layer_name, layer in self.classifier.named_modules():
                 if (
                     isinstance(layer, torch.nn.BatchNorm2d)
                     or isinstance(layer, torch.nn.GroupNorm)
@@ -213,20 +228,45 @@ class PLClassifier(pl.LightningModule):
             for param in self.classifier.parameters():
                 param.requires_grad = True
 
+    def test(self, testloader):
+        self.classifier.eval()
+        preds, targets = [], []
+        total_loss = 0.0
+        with torch.no_grad():
+            for data, target in testloader:
+                pred = self.classifier(data.to(self.device)).squeeze()
+                loss = self.loss_fn(pred, target.to(torch.float))
+                preds.append(torch.sigmoid(pred.detach().cpu()))
+                targets.extend(target.detach().cpu().tolist())
+                total_loss += loss.detach().cpu().item()
+
+        preds = torch.vstack(preds).squeeze()
+        pred_classes = torch.where(preds < 0.5, 0, 1).tolist()
+        mcc = metrics.matthews_corrcoef(targets, pred_classes)
+        acc = metrics.accuracy_score(targets, pred_classes)
+        roc = metrics.roc_auc_score(targets, pred)
+        out = {
+            "test_loss": total_loss / len(testloader),
+            "test_mcc": mcc,
+            "test_accuracy": acc,
+            "test_roc": roc,
+        }
+        return out
+
 
 # %%
 classifier = PLClassifier(class_weights)
 trainer = pl.Trainer(
-    max_epochs=args.num_epochs,
+    max_epochs=2,  # args.num_epochs,
     gpus=1 if torch.cuda.is_available() else 0,
     logger=logger,
+    overfit_batches=2,
 )
 # %%
 trainer.fit(classifier, trainloader, valloader)
 
 # %%
-trainer.test(classifier, trainloader)
-trainer.test(classifier, testloader)
+classifier.test(testloader)
 
 # %%
 from deepee.watchdog import PrivacyWatchdog, PrivacyBudgetExhausted
@@ -234,18 +274,19 @@ from deepee import PrivacyWrapper
 
 
 # %%
+logger = pl.loggers.TensorBoardLogger("logs", name="pneumonia_classification")
+# %%
 # now privately
 
 
-class PrivatePLClassifier(pl.LightningModule):
+class PrivatePLClassifier(PLClassifier):
     def __init__(self, class_weights):
-        super().__init__()
-        model = tv.models.resnet18(pretrained=True)
-        model.fc = torch.nn.Linear(512, 1)
+        super().__init__(None, True)
+        model = tv.models.vgg11_bn(pretrained=True)
+        model.classifier = torch.nn.Linear(512 * 7 * 7, 1)
         for param in model.parameters():
             param.requires_grad = False
-        model.fc = torch.nn.Linear(512, 1)
-        for param in model.fc.parameters():
+        for param in model.classifier.parameters():
             param.requires_grad = True
         self.loss_fn = torch.nn.functional.binary_cross_entropy_with_logits
         self.weight = class_weights
@@ -259,16 +300,8 @@ class PrivatePLClassifier(pl.LightningModule):
             # fallback_to_rdp=True,
         )
         self.classifier = PrivacyWrapper(
-            model,
-            args.batch_size,
-            0.3,
-            0.5,
-            watchdog=watchdog,  # watchdog,
+            model, args.batch_size, 1.0, 1.5, watchdog=watchdog,  # watchdog,
         )
-
-    def forward(self, x):
-        embedding = self.classifier(x)
-        return embedding
 
     def training_step(self, batch, batch_idx):
         data, target = batch
@@ -283,37 +316,6 @@ class PrivatePLClassifier(pl.LightningModule):
         self.log("train_loss", loss)
         output = {"loss": loss}
         return output
-
-    def validation_step(self, batch, batch_idx):
-        data, target = batch
-        pred = self.classifier(data).squeeze()
-        loss = self.loss_fn(pred, target.to(torch.float))
-        pred_classes = torch.where(pred.detach().cpu() < 0.5, 0, 1).tolist()
-        target = target.cpu().detach().tolist()
-        mcc = metrics.matthews_corrcoef(target, pred_classes)
-        acc = metrics.accuracy_score(target, pred_classes)
-        out = {"val_loss": loss, "val_mcc": mcc, "val_accuracy": acc}
-        for key, value in out.items():
-            self.log(key, value)
-        return out
-
-    def test_step(self, batch, batch_idx):
-        data, target = batch
-        target = target
-        pred = self.classifier(data).squeeze()
-        loss = self.loss_fn(pred, target.to(torch.float))
-        pred_classes = torch.where(pred.detach().cpu() < 0.5, 0, 1).tolist()
-        target = target.cpu().detach().tolist()
-        mcc = metrics.matthews_corrcoef(target, pred_classes)
-        acc = metrics.accuracy_score(target, pred_classes)
-        out = {"test_loss": loss, "test_mcc": mcc, "test_accuracy": acc}
-        for key, value in out.items():
-            self.log(key, value)
-        return out
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.parameters(), lr=1e-3)
-        return optimizer
 
     def on_after_backward(self):
         self.classifier.clip_and_accumulate()
@@ -346,9 +348,9 @@ class PrivatePLClassifier(pl.LightningModule):
 privateclassifier = PrivatePLClassifier(class_weights)
 privatetrainer = pl.Trainer(
     max_epochs=args.num_epochs,
-    weights_summary=None,
     gpus=1 if torch.cuda.is_available() else 0,
     logger=logger,
+    # overfit_batches=1,
 )
 # %%
 try:
@@ -359,7 +361,16 @@ except PrivacyBudgetExhausted as e:
 # %%
 print(f"Final epsilon: {privateclassifier.classifier.current_epsilon:.2f}")
 # %%
-privatetrainer.test(privateclassifier, trainloader)
-privatetrainer.test(privateclassifier, testloader)
+privateclassifier.test(testloader)
+# %%
+# rdp version
+from deepee.watchdog import compute_rdp, rdp_privacy_spent
+
+q = args.batch_size / len(trainset)
+orders = [1 + x / 10.0 for x in range(1, 100)] + list(range(12, 64))
+steps_taken = args.num_epochs * len(trainloader)
+rdp = compute_rdp(q, 0.8, steps_taken, orders)
+spent, _ = rdp_privacy_spent(orders=orders, rdp=rdp, delta=1e-5)
+print(f"RDP epsilon: {spent}")
 
 # %%

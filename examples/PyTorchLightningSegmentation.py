@@ -189,8 +189,7 @@ class SegmentationNetwork(pl.LightningModule):
             encoder_name="vgg11_bn", encoder_weights="imagenet", classes=22
         )
         self.loss_fn = smp.utils.losses.DiceLoss(
-            activation="sigmoid",
-            ignore_channels=[22],
+            activation="sigmoid", ignore_channels=[22],
         )
 
     def forward(self, x):
@@ -268,11 +267,7 @@ class PrivateSegmentationNetwork(pl.LightningModule):
             report_every_n_steps=len(trainloader),
         )
         self.model = PrivacyWrapper(
-            self.model,
-            args.batch_size,
-            1.0,
-            1.0,
-            watchdog=watchdog,
+            self.model, args.batch_size, 1.0, 1.0, watchdog=watchdog,
         ).to(args.device)
 
     def forward(self, x):
@@ -319,9 +314,7 @@ class PrivateSegmentationNetwork(pl.LightningModule):
 # %%
 private_model = PrivateSegmentationNetwork()
 trainer = pl.Trainer(
-    max_epochs=args.num_epochs,
-    weights_summary=None,
-    gpus=1 if torch.cuda.is_available() else 0,
+    max_epochs=args.num_epochs, gpus=1 if torch.cuda.is_available() else 0,
 )
 try:
     trainer.fit(private_model, trainloader, valloader)
