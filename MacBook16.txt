@@ -1,0 +1,57 @@
+Opacus
+Deepee
+Filename: segmentation_benchmarks/profile_deepee.py
+
+Line #    Mem usage    Increment  Occurences   Line Contents
+============================================================
+    38   1307.7 MiB   1307.7 MiB           1   @profile
+    39                                         def main():
+    40   1307.7 MiB      0.0 MiB           1       model.train()
+    41   1307.7 MiB      0.0 MiB           1       optimizer.zero_grad()
+    42   1316.4 MiB      8.7 MiB           1       data, _ = next(iter(dataloader))
+    43   6867.4 MiB   5551.0 MiB           1       output = model(data)
+    44   6875.5 MiB      8.2 MiB           1       loss = criterion(data, output)
+    45   7453.9 MiB    578.4 MiB           1       loss.backward()
+    46   7964.2 MiB    510.3 MiB           1       model.clip_and_accumulate()
+    47   7964.3 MiB      0.0 MiB           1       model.noise_gradient()
+    48   7964.3 MiB      0.0 MiB           1       model.prepare_next_batch()
+    49   7964.3 MiB      0.0 MiB           1       optimizer.step()
+
+
+Opacus
+Filename: segmentation_benchmarks/profile_opacus.py
+
+Line #    Mem usage    Increment  Occurences   Line Contents
+============================================================
+    47   1154.1 MiB   1154.1 MiB           1   @profile
+    48                                         def main():
+    49   1154.1 MiB      0.0 MiB           1       model.train()
+    50   1154.1 MiB      0.0 MiB           1       optimizer.zero_grad()
+    51   1173.1 MiB     19.0 MiB           1       data, _ = next(iter(dataloader))
+    52   6634.6 MiB   5461.5 MiB           1       output = model(data)
+    53   6642.8 MiB      8.2 MiB           1       loss = criterion(data, output)
+    54   8669.6 MiB   2026.8 MiB           1       loss.backward()
+    55   8669.6 MiB      0.0 MiB           1       optimizer.step()
+
+
+Pyvacy
+Filename: segmentation_benchmarks/profile_pyvacy.py
+
+Line #    Mem usage    Increment  Occurences   Line Contents
+============================================================
+    42   1215.4 MiB   1215.4 MiB           1   @profile
+    43                                         def main():
+    44   1215.4 MiB      0.0 MiB           1       model.train()
+    45   1215.4 MiB      0.0 MiB           1       optimizer.zero_grad()
+    46   1232.9 MiB     17.5 MiB           1       X_minibatch, y_minibatch = next(iter(dataloader))
+    47   2027.5 MiB      0.0 MiB          34       for X_microbatch, _ in microbatch_loader(
+    48   1232.9 MiB      0.0 MiB           1           torch.utils.data.TensorDataset(X_minibatch, y_minibatch)
+    49                                             ):
+    50   2027.5 MiB      0.0 MiB          32           optimizer.zero_microbatch_grad()
+    51   2027.5 MiB    456.9 MiB          32           output = model(X_microbatch)
+    52   2027.5 MiB      0.2 MiB          32           loss = criterion(X_microbatch, output)
+    53   2027.5 MiB    335.3 MiB          32           loss.backward()
+    54   2027.5 MiB      2.3 MiB          32           optimizer.microbatch_step()
+    55   2027.6 MiB      0.1 MiB           1       optimizer.step()
+
+
