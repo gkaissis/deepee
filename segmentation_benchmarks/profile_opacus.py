@@ -6,6 +6,10 @@ import torchvision
 from memory_profiler import profile
 import segmentation_models_pytorch as smp
 
+import warnings
+
+warnings.filterwarnings("ignore")
+
 model = smp.Unet(
     encoder_name="vgg11_bn",
     encoder_weights="imagenet",
