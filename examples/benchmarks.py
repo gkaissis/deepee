@@ -13,17 +13,20 @@ class args:
     batch_size: int = 32
     secure_rng: bool = False  # true not supported yet
     steps: int = 25
-    model: str = "resnet152"
+    model: str = "resnet18"
     optim: str = "SGD"
-    experiment: str = "memory"
+    experiment: str = "speed"
     force_cpu: bool = experiment == "memory"
     framework: str = "deepee"
+    if experiment == "memory":
+        steps = 1
     assert framework in ["all", "deepee", "opacus", "pyvacy"]
     assert experiment in ["memory", "speed"]
 
 
 # %%
-class DPTraining:
+class DPBenchmarkClassification:
+    # @profile
     def __init__(self, args: args) -> None:
         self.args: args = args
         self.setup_model()
@@ -35,13 +38,8 @@ class DPTraining:
         ) if torch.cuda.is_available() and not args.force_cpu else torch.device("cpu")
         self.model.to(self.device)
 
-    @profile
+    # @profile
     def __train_step__(self, data, target) -> None:
-        # data: torch.tensor = torch.randn(
-        #     (self.args.batch_size, 3, self.args.resolution, self.args.resolution),
-        #     device=self.device,
-        # )
-        # target: torch.tensor = torch.randint(2, (args.batch_size), device=self.device)
         self.on_before_train_step()
         self.optim.zero_grad()
         self.on_after_zero_grad()
@@ -54,18 +52,19 @@ class DPTraining:
         self.optim.step()
         self.on_after_train_step()
 
+    # @profile
     def time_training(self) -> float:
         tick = time()
         total_num_steps = 0
         self.on_before_training()
         while True:
+            if total_num_steps > self.args.steps:  # meh
+                break
             for data, target in self.trainloader:
                 self.__train_step__(data.to(self.device), target.to(self.device))
                 total_num_steps += 1
                 if total_num_steps > self.args.steps:
                     break
-            if total_num_steps > self.args.steps:  # meh
-                break
         self.on_after_training()
         tock = time()
         return tock - tick
@@ -155,6 +154,55 @@ class DPTraining:
 
 
 # %%
+import segmentation_models_pytorch as smp
+
+
+class DPBenchmarkAutoencoder(DPBenchmarkClassification):
+    def __init__(self, args):
+        super().__init__(args)
+        self.loss_fn = smp.utils.losses.DiceLoss()
+
+    def setup_model(self):
+        if self.args.model == "resnet18":
+            self.model = smp.Unet(
+                encoder_name="vgg11_bn",
+                encoder_weights="imagenet",
+                classes=1,
+                in_channels=1,
+                activation="sigmoid",
+            )
+        else:
+            raise ValueError(f"Model {self.args.model} not supported")
+
+    def setup_dataset(self) -> None:
+        self.dataset: torch.utils.data.Dataset = tv.datasets.FakeData(
+            size=self.args.steps * self.args.batch_size,
+            image_size=(1, self.args.resolution, self.args.resolution),
+            num_classes=2,
+            transform=tv.transforms.ToTensor(),
+        )
+
+    def __train_step__(self, data, target) -> None:
+        self.on_before_train_step()
+        self.optim.zero_grad()
+        self.on_after_zero_grad()
+        pred = self.make_prediction(data)
+        self.on_after_prediction()
+        loss = self.calc_loss(pred, data)
+        self.on_after_loss()
+        self.backward(loss)
+        self.on_after_backward()
+        self.optim.step()
+        self.on_after_train_step()
+
+    def make_prediction(self, data):
+        return self.model(data)
+
+    def calc_loss(self, pred, target):
+        return self.loss_fn(pred, target)
+
+
+# %%
 def analyse_result(timeit_result: List[float]) -> str:
     sorted_list = sorted(timeit_result)
     m = float(sum(timeit_result)) / len(timeit_result)
@@ -175,7 +223,9 @@ if args.framework in ["all", "deepee"]:
     from deepee import ModelSurgeon, SurgicalProcedures
     from deepee import UniformDataLoader
 
-    class deepee_DPTrainer(DPTraining):
+    class deepee_DPTrainer(DPBenchmarkAutoencoder):
+        # class deepee_DPTrainer(DPBenchmarkClassification):
+        # @profile
         def __init__(self, args: args):
             super().__init__(args)
             watchdog = PrivacyWatchdog(
@@ -197,7 +247,14 @@ if args.framework in ["all", "deepee"]:
             ).to(self.device)
 
         def setup_dataloader(self) -> None:
-            self.trainloader = UniformDataLoader(self.dataset, self.args.batch_size)
+            self.trainloader = UniformDataLoader(
+                self.dataset,
+                self.args.batch_size,
+                pin_memory=torch.cuda.is_available() and not self.args.force_cpu,
+                num_workers=0
+                if torch.cuda.is_available() and not self.args.force_cpu
+                else 8,
+            )
 
         def on_after_backward(self) -> None:
             self.model.clip_and_accumulate()
@@ -214,7 +271,8 @@ if args.framework in ["all", "opacus"]:
     from opacus.utils.module_modification import convert_batchnorm_modules
     from opacus.utils.uniform_sampler import UniformWithReplacementSampler
 
-    class opacus_DPTrainer(DPTraining):
+    class opacus_DPTrainer(DPBenchmarkAutoencoder):
+        # class opacus_DPTrainer(DPBenchmarkClassification):
         def __init__(self, args):
             super().__init__(args)
             self.model = convert_batchnorm_modules(self.model.cpu()).to(self.device)
@@ -235,7 +293,8 @@ if args.framework in ["all", "pyvacy"]:
     from pyvacy import optim as pyvacyoptim
     from pyvacy import sampling as pyvacysampling
 
-    class pyvacy_DPTrainer(DPTraining):
+    class pyvacy_DPTrainer(DPBenchmarkAutoencoder):
+        # class pyvacy_DPTrainer(DPBenchmarkClassification):
         def __init__(self, args):
             super().__init__(args)
             self.setup_optim()
@@ -260,7 +319,7 @@ if args.framework in ["all", "pyvacy"]:
             )
             self.trainloader = minibatch_loader(self.dataset)
 
-        @profile
+        # @profile
         def __train_step__(self, data, target) -> None:
             self.optim.zero_grad()
             for micro_x, micro_y in self.microbatchloader(
@@ -268,7 +327,8 @@ if args.framework in ["all", "pyvacy"]:
             ):
                 self.optim.zero_microbatch_grad()
                 pred = self.make_prediction(micro_x)
-                loss = self.calc_loss(pred, micro_y)
+                loss = self.calc_loss(pred, micro_x)  # different for classification
+                # loss = self.calc_loss(pred, micro_y)
                 self.backward(loss)
                 self.optim.microbatch_step()
             self.optim.step()
@@ -314,7 +374,7 @@ def pyvacy_run(num_runs):
 
 if args.experiment == "memory":
 
-    # @profile
+    @profile
     def profile():
         if args.framework == "deepee":
             tr = deepee_DPTrainer(args)
