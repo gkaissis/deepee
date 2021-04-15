@@ -15,9 +15,10 @@ class args:
     steps: int = 25
     model: str = "resnet18"
     optim: str = "SGD"
-    experiment: str = "speed"
+    experiment: str = "memory"
     force_cpu: bool = experiment == "memory"
     framework: str = "deepee"
+    task = "segmentation"
     if experiment == "memory":
         steps = 1
     assert framework in ["all", "deepee", "opacus", "pyvacy"]
@@ -223,7 +224,11 @@ if args.framework in ["all", "deepee"]:
     from deepee import ModelSurgeon, SurgicalProcedures
     from deepee import UniformDataLoader
 
-    class deepee_DPTrainer(DPBenchmarkAutoencoder):
+    class deepee_DPTrainer(
+        DPBenchmarkAutoencoder
+        if args.task == "segmentation"
+        else DPBenchmarkClassification
+    ):
         # class deepee_DPTrainer(DPBenchmarkClassification):
         # @profile
         def __init__(self, args: args):
@@ -271,7 +276,11 @@ if args.framework in ["all", "opacus"]:
     from opacus.utils.module_modification import convert_batchnorm_modules
     from opacus.utils.uniform_sampler import UniformWithReplacementSampler
 
-    class opacus_DPTrainer(DPBenchmarkAutoencoder):
+    class opacus_DPTrainer(
+        DPBenchmarkAutoencoder
+        if args.task == "segmentation"
+        else DPBenchmarkClassification
+    ):
         # class opacus_DPTrainer(DPBenchmarkClassification):
         def __init__(self, args):
             super().__init__(args)
@@ -293,7 +302,11 @@ if args.framework in ["all", "pyvacy"]:
     from pyvacy import optim as pyvacyoptim
     from pyvacy import sampling as pyvacysampling
 
-    class pyvacy_DPTrainer(DPBenchmarkAutoencoder):
+    class pyvacy_DPTrainer(
+        DPBenchmarkAutoencoder
+        if args.task == "segmentation"
+        else DPBenchmarkClassification
+    ):
         # class pyvacy_DPTrainer(DPBenchmarkClassification):
         def __init__(self, args):
             super().__init__(args)
@@ -327,8 +340,10 @@ if args.framework in ["all", "pyvacy"]:
             ):
                 self.optim.zero_microbatch_grad()
                 pred = self.make_prediction(micro_x)
-                loss = self.calc_loss(pred, micro_x)  # different for classification
-                # loss = self.calc_loss(pred, micro_y)
+                if self.args == "segmentation":
+                    loss = self.calc_loss(pred, micro_x)  # different for classification
+                else:
+                    loss = self.calc_loss(pred, micro_y)
                 self.backward(loss)
                 self.optim.microbatch_step()
             self.optim.step()
@@ -375,7 +390,7 @@ def pyvacy_run(num_runs):
 if args.experiment == "memory":
 
     @profile
-    def profile():
+    def profile_memory():
         if args.framework == "deepee":
             tr = deepee_DPTrainer(args)
         elif args.framework == "opacus":
@@ -389,7 +404,7 @@ if args.experiment == "memory":
             )
         tr.time_training()
 
-    profile()
+    profile_memory()
 elif args.experiment == "speed":
     n = 5
     if args.framework in ["deepee", "all"]:
