@@ -1,10 +1,17 @@
-from torch import optim
-from deepee import PrivacyWrapper, UniformDataLoader, ModelSurgeon, SurgicalProcedures
+import os
+
+os.environ["OMP_NUM_THREADS"] = "16"
 import torch
+
+torch.set_num_threads(16)
+torch.set_num_interop_threads(16)
+from deepee import PrivacyWrapper, UniformDataLoader, ModelSurgeon, SurgicalProcedures
 import torchvision
 from memory_profiler import profile
 import segmentation_models_pytorch as smp
+import gc
 
+gc.disable()
 
 model = smp.Unet(
     encoder_name="vgg11_bn",
@@ -15,7 +22,7 @@ model = smp.Unet(
 )
 
 
-surgeon = ModelSurgeon(SurgicalProcedures.BN_to_BN_nostats)
+surgeon = ModelSurgeon(SurgicalProcedures.BN_to_GN)
 model = surgeon.operate(model)
 model = PrivacyWrapper(
     model, num_replicas=32, L2_clip=1.0, noise_multiplier=1.0, secure_rng=False

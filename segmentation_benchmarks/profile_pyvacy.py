@@ -1,11 +1,19 @@
-from torch import optim
+import os
+
+os.environ["OMP_NUM_THREADS"] = "16"
+import torch
+
+torch.set_num_threads(16)
+torch.set_num_interop_threads(16)
 from pyvacy.optim import DPSGD
 from pyvacy.sampling import get_data_loaders
 from opacus.utils.module_modification import convert_batchnorm_modules
-import torch
 import torchvision
 from memory_profiler import profile
 import segmentation_models_pytorch as smp
+import gc
+
+gc.disable()
 
 model = smp.Unet(
     encoder_name="vgg11_bn",

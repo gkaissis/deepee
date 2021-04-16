@@ -1,7 +1,12 @@
-from torch import optim
+import os
+
+os.environ["OMP_NUM_THREADS"] = "16"
+import torch
+
+torch.set_num_threads(16)
+torch.set_num_interop_threads(16)
 from opacus import PrivacyEngine
 from opacus.utils.module_modification import convert_batchnorm_modules
-import torch
 import torchvision
 from memory_profiler import profile
 import segmentation_models_pytorch as smp
@@ -9,6 +14,9 @@ import segmentation_models_pytorch as smp
 import warnings
 
 warnings.filterwarnings("ignore")
+import gc
+
+gc.disable()
 
 model = smp.Unet(
     encoder_name="vgg11_bn",
@@ -40,7 +48,7 @@ privacy_engine = PrivacyEngine(
     max_grad_norm=1.0,
     secure_rng=False,
 )
-
+privacy_engine.attach(optimizer)
 criterion = smp.utils.losses.DiceLoss()
 
 
