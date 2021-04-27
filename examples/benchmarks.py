@@ -17,7 +17,7 @@ class args:
     optim: str = "SGD"
     experiment: str = "memory"
     force_cpu: bool = experiment == "memory"
-    framework: str = "deepee"
+    framework: str = "opacus"
     task = "segmentation"
     if experiment == "memory":
         steps = 1
@@ -34,9 +34,11 @@ class DPBenchmarkClassification:
         self.setup_optim()
         self.setup_dataset()
         self.setup_dataloader()
-        self.device: torch.device = torch.device(
-            "cuda"
-        ) if torch.cuda.is_available() and not args.force_cpu else torch.device("cpu")
+        self.device: torch.device = (
+            torch.device("cuda")
+            if torch.cuda.is_available() and not args.force_cpu
+            else torch.device("cpu")
+        )
         self.model.to(self.device)
 
     # @profile
@@ -110,10 +112,8 @@ class DPBenchmarkClassification:
             self.dataset,
             batch_size=args.batch_size,
             shuffle=True,
-            pin_memory=torch.cuda.is_available() and not self.args.force_cpu,
-            num_workers=0
-            if torch.cuda.is_available() and not self.args.force_cpu
-            else 8,
+            pin_memory=False,
+            num_workers=0,
         )
 
     def make_prediction(self, data: torch.tensor) -> torch.tensor:
@@ -255,10 +255,8 @@ if args.framework in ["all", "deepee"]:
             self.trainloader = UniformDataLoader(
                 self.dataset,
                 self.args.batch_size,
-                pin_memory=torch.cuda.is_available() and not self.args.force_cpu,
-                num_workers=0
-                if torch.cuda.is_available() and not self.args.force_cpu
-                else 8,
+                pin_memory=False,
+                num_workers=0,
             )
 
         def on_after_backward(self) -> None:
@@ -389,7 +387,7 @@ def pyvacy_run(num_runs):
 
 if args.experiment == "memory":
 
-    @profile
+    # @profile
     def profile_memory():
         if args.framework == "deepee":
             tr = deepee_DPTrainer(args)
