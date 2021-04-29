@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 from sklearn import metrics
 import numpy as np
 import albumentations as a
+from datetime import datetime
 
 from dataloader import (
     MSD_data_images,
@@ -20,6 +21,9 @@ from dataloader import (
 from deepee import UniformDataLoader
 
 # %%
+timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+
+
 class args:
     batch_size = 32
     test_batch_size = 32
@@ -51,12 +55,12 @@ mean, std = calc_mean_std(trainset)
 # change transforms based on stats
 train_tf = create_albu_transform(args, mean, std)
 trainset.transform = train_tf
-L_train = round(0.85 * len(trainset))
-trainset, valset = torch.utils.data.random_split(
-    trainset,
-    (L_train, len(trainset) - L_train),
-    generator=torch.Generator().manual_seed(42),
-)
+# L_train = round(0.85 * len(trainset))
+# trainset, valset = torch.utils.data.random_split(
+#     trainset,
+#     (L_train, len(trainset) - L_train),
+#     generator=torch.Generator().manual_seed(42),
+# )
 
 # mask is a special keyword in albumentations
 test_trans = a.Compose(
@@ -80,8 +84,11 @@ test_trans = a.Compose(
     ]
 )
 
-testset = MSD_data_images(
+valset = MSD_data_images(
     args.data_dir + "/val", transform=AlbumentationsTorchTransform(test_trans),
+)
+testset = MSD_data_images(
+    args.data_dir + "/test", transform=AlbumentationsTorchTransform(test_trans),
 )
 trainloader = UniformDataLoader(
     trainset,
@@ -91,7 +98,7 @@ trainloader = UniformDataLoader(
 )
 valloader = torch.utils.data.DataLoader(
     valset,
-    batch_size=args.batch_size,
+    batch_size=args.test_batch_size,
     pin_memory=torch.cuda.is_available(),
     num_workers=0 if torch.cuda.is_available() else 32,
 )
@@ -225,40 +232,43 @@ class SegmentationNetwork(pl.LightningModule):
 
 
 # %%
-model = SegmentationNetwork()
-temp_tr = pl.Trainer()
-lr_finder = temp_tr.tuner.lr_find(
-    model, train_dataloader=trainloader, min_lr=1e-5, max_lr=1e-1, num_training=50
-)
-# %%
-fig = lr_finder.plot(suggest=True)
-# plt.xlim(right=0.1)
-# plt.ylim(bottom=0.0, top=0.7)
-fig.show()
+# model = SegmentationNetwork()
+# temp_tr = pl.Trainer()
+# lr_finder = temp_tr.tuner.lr_find(
+#     model, train_dataloader=trainloader, min_lr=1e-5, max_lr=1e-1, num_training=50
+# )
+# # %%
+# fig = lr_finder.plot(suggest=True)
+# # plt.xlim(right=0.1)
+# # plt.ylim(bottom=0.0, top=0.7)
+# fig.show()
 # %%
 args.lr = 1e-2
 args.num_epochs = 20
 # %%
-results = []
-for _ in range(5):
-    model = SegmentationNetwork()
-    trainer = pl.Trainer(
-        max_epochs=args.num_epochs, gpus=1 if torch.cuda.is_available() else 0
-    )
-    # %%
-    trainer.fit(model, trainloader, valloader)
-    # %%
-    res = model.test(testloader)
-    print(res)
-    results.append(res)
-torch.save(results, "vanilla_segmentation.pt")
-# %%
-img_batch = torch.stack([testset[i][0] for i in range(0, len(testset), 25)])
-model.eval()
-seg_batch = model(img_batch.to(model.device)).detach().cpu()
-seg_batch = torch.where(seg_batch > 0.5, 1, 0)
-# %%
-visualize_seg(img_batch, segmentation_to_RGB(seg_batch))
+# results = []
+# for i in range(5):
+#     model = SegmentationNetwork()
+#     logger = pl.loggers.TensorBoardLogger(
+#         "logs", name=f"liver_segmentation_{timestamp}_v{i}"
+#     )
+#     trainer = pl.Trainer(
+#         max_epochs=args.num_epochs,
+#         gpus=1 if torch.cuda.is_available() else 0,
+#         logger=logger,
+#     )
+#     trainer.fit(model, trainloader, valloader)
+#     res = model.test(testloader)
+#     print(res)
+#     results.append(res)
+# torch.save(results, f"vanilla_segmentation_{timestamp}.pt")
+# # %%
+# img_batch = torch.stack([testset[i][0] for i in range(0, len(testset), 25)])
+# model.eval()
+# seg_batch = model(img_batch.to(model.device)).detach().cpu()
+# seg_batch = torch.where(seg_batch > 0.5, 1, 0)
+# # %%
+# visualize_seg(img_batch, segmentation_to_RGB(seg_batch))
 # %%
 from deepee.watchdog import PrivacyWatchdog, PrivacyBudgetExhausted
 from deepee import PrivacyWrapper
@@ -318,23 +328,25 @@ class PrivateSegmentationNetwork(SegmentationNetwork):
 
 
 # %%
-model = PrivateSegmentationNetwork()
-temp_tr = pl.Trainer()
-lr_finder = temp_tr.tuner.lr_find(
-    model, train_dataloader=trainloader, min_lr=1e-5, max_lr=1e-1, num_training=50
-)
-# %%
-fig = lr_finder.plot(suggest=True)
-# plt.xlim(right=0.1)
-# plt.ylim(bottom=0.0, top=0.7)
-fig.show()
+# model = PrivateSegmentationNetwork()
+# temp_tr = pl.Trainer()
+# lr_finder = temp_tr.tuner.lr_find(
+#     model, train_dataloader=trainloader, min_lr=1e-5, max_lr=1e-1, num_training=50
+# )
+# # %%
+# fig = lr_finder.plot(suggest=True)
+# # plt.xlim(right=0.1)
+# # plt.ylim(bottom=0.0, top=0.7)
+# fig.show()
 # %%
 args.lr = 1e-2
-args.num_epochs = 5
+args.num_epochs = 20
 # %%
 results = []
-for _ in range(5):
-    logger = pl.loggers.TensorBoardLogger("logs", name="liver_segmentation")
+for i in range(5):
+    logger = pl.loggers.TensorBoardLogger(
+        "logs", name=f"liver_segmentation_DP_{timestamp}_v{i}"
+    )
     private_model = PrivateSegmentationNetwork()
     trainer = pl.Trainer(
         max_epochs=args.num_epochs,
@@ -346,12 +358,14 @@ for _ in range(5):
     except PrivacyBudgetExhausted as e:
         print(f"Privacy budget is exhausted")
     # %%
-    print(f"Final epsilon: {private_model.model.current_epsilon:.2f}")
+    final_eps = private_model.model.current_epsilon
+    print(f"Final epsilon: {final_eps:.2f}")
     # %%
     res = private_model.test(testloader)
+    res["final_epsilon"] = final_eps
     print(res)
     results.append(res)
-torch.save(results, "DP_segmentation_results_small_epsilon.pt")
+torch.save(results, f"DP_segmentation_results_{timestamp}.pt")
 # %%
 img_batch = torch.stack([testset[i][0] for i in range(0, len(testset), 25)])
 seg_batch = (

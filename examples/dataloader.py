@@ -91,11 +91,7 @@ def create_albu_transform(args, mean, std):
             ).astype(np.float32),
         ),
     ]
-    train_tf_albu = AlbumentationsTorchTransform(
-        a.Compose(
-            transformations,
-        )
-    )
+    train_tf_albu = AlbumentationsTorchTransform(a.Compose(transformations,))
     return train_tf_albu
 
 
@@ -112,9 +108,7 @@ def l1_sensitivity(query: Callable, d: tensor) -> float:
 
 
 def calc_mean_std(
-    dataset,
-    save_folder=None,
-    epsilon=None,
+    dataset, save_folder=None, epsilon=None,
 ):
     """
     Calculates the mean and standard deviation of `dataset` and
@@ -528,14 +522,7 @@ class MSD_data(torchdata.Dataset):
                 )
             # creating label mask from bounding box dimensions
             label = create_3D_label(
-                b[0],
-                b[1],
-                b[2],
-                b[3],
-                b[4],
-                b[5],
-                label.shape[1],
-                label.shape[2],
+                b[0], b[1], b[2], b[3], b[4], b[5], label.shape[1], label.shape[2],
             )
 
         # cropping scan and label volumes to reduce the number of non-pancreas slices
@@ -626,6 +613,8 @@ class MSD_data_images(torchdata.Dataset):
         return len(self.scan_names)
 
     def __getitem__(self, key):
+        if isinstance(key, np.integer):
+            key = int(key)
         if isinstance(key, slice):
             # get the start, stop, and step from the slice
             return [self[ii] for ii in range(*key.indices(len(self)))]
@@ -787,11 +776,7 @@ if __name__ == "__main__":
     img.show()
 
     tf = transforms.Compose(
-        [
-            transforms.Resize(224),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-        ]
+        [transforms.Resize(224), transforms.CenterCrop(224), transforms.ToTensor(),]
     )
     ds = PPPP(train=True, transform=tf)
 
