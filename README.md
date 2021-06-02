@@ -7,4 +7,4 @@ It wraps a regular `PyTorch` model and takes care of calculating per-sample grad
 Check out the documentation [here](http://g-k.ai/deepee/)
 
 # For paper readers
-If you would like to reproduce the results from our paper, please go [here]()
+If you would like to reproduce the results from our paper, please go [here](https://github.com/gkaissis/deepee/tree/results)
