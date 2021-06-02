@@ -1,9 +1,7 @@
 site_name: deepee
 nav:
   - Home: index.md
-  - FAQ: faq.md
   - Examples: examples.md
-  - API: API_reference.md
 theme:
   name: material
   palette:
