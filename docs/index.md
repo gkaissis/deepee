@@ -23,7 +23,7 @@ The key component of the framework is the `PrivacyWrapper` class, which wraps a 
 An example for the use of `deepee` showcasing all these concepts can be found [here](examples.md).
 
 # For paper readers
-If you would like to reproduce the experiments from our paper, please switch to the `paper` branch. Instructions for reproduction can be found in the README of the branch.
+If you would like to reproduce the experiments from our paper, please switch to the `results` branch. Instructions for reproduction can be found in the README of the branch.
 # Installation
 You can install deepee with:
 
