@@ -1,10 +1,14 @@
-# `deepee`
+# Paper Results
 
-`deepee` is a library for differentially private deep learning in PyTorch. More precisely, `deepee` implements the Differentially Private Stochastic Gradient Descent (DP-SGD) algorithm originally described by [Abadi et al.](https://arxiv.org/pdf/1607.00133.pdf). Despite the name, `deepee` works with any (first order) optimizer, including Adam, AdaGrad, etc. 
+This branch contains the results for our publication. The following experiments can be found in the `results` directory:
 
-It wraps a regular `PyTorch` model and takes care of calculating per-sample gradients, clipping, noising and accumulating gradients with an API which closely mimics the `PyTorch` API of the original model.
+- The results from Table 1 can be obtained by running the `PneumoniaClassification.py` script
+- The results from Table 2 can be obtained by running the `LiverSegmentation.py` script
+- The results from Table 3 can be obtained by running the scripts contained in the following directories:
+    - The timing benchmarks can be found in `benchmarks.py`
+    - The memory benchmarks (and additional timing benchmarks) can be found in the `*_benchmarks_memory` directories. The `unsupported_layer_benchmarks` directory contains an additional module `unet.py` which is required as an import but doesn't contain any experimental code.
+    
 
-Check out the documentation [here](http://g-k.ai/deepee/)
+The `dataloader` script contains utilities and is not required.
 
-# For paper readers
-If you would like to reproduce the results from our paper, please go [here]()
+Running these scripts requires the following additional dependencies: `scikit-learn`, `albumentations`, `opacus`, `pyvacy`, `tqdm` and `pytorch-lightning`. Optionally, `tensorboard` can be used to monitor trainings.
