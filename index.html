@@ -253,7 +253,7 @@
 <p>The key component of the framework is the <code>PrivacyWrapper</code> class, which wraps a <code>PyTorch module</code> and takes care of the training process behind the scenes. The clipping norm and noise multiplier parameters can be set here. <code>deepee</code> will automatically check if a model contains incompatible layers (such as Batch Normalisation) and throw an error. If such layers exist in the network, the <code>ModelSurgeon</code> can be used to replace them with compatible layers such as Group Normalisation, Instance Normalisation etc.. <code>deepee</code> also offers automatic privacy accounting and will interrupt the training (and optionally save the last model) when the privacy budget is exhausted. This process is abstracted using the <code>PrivacyWatchdog</code> class. </p>
 <p>An example for the use of <code>deepee</code> showcasing all these concepts can be found <a href="examples/">here</a>.</p>
 <h1 id="for-paper-readers">For paper readers</h1>
-<p>If you would like to reproduce the experiments from our paper, please switch to the <code>paper</code> branch. Instructions for reproduction can be found in the README of the branch.</p>
+<p>If you would like to reproduce the experiments from our paper, please switch to the <code>results</code> branch. Instructions for reproduction can be found in the README of the branch.</p>
 <h1 id="installation">Installation</h1>
 <p>You can install deepee with:</p>
 <p><code>pip install deepee</code></p>
