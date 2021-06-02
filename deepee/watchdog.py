@@ -1,7 +1,6 @@
 from typing import Optional, Union
 import torch
 from torch import nn
-from torch._C import Value
 from torch.utils import data
 from torch.utils.data import DataLoader
 from pathlib import Path
@@ -151,7 +150,7 @@ class PrivacyWatchdog:
             else:
                 logging.warning(
                     f"Privacy budget exhausted. Epsilon spent is {spent}, epsilon"
-                    "allowed is {self.target_epsilon:.2f} at delta {self.target_delta:.2e}"
+                    f"allowed is {self.target_epsilon:.2f} at delta {self.target_delta:.2e}"
                 )
 
     def abort_training(
@@ -161,7 +160,7 @@ class PrivacyWatchdog:
         path: Optional[Union[str, Path]] = None,
     ):
         error_message = f"Privacy budget exhausted. Epsilon spent is {epsilon_spent},"
-        "epsilon allowed is {self.target_epsilon:.2f} at delta {self.target_delta:e}"
+        f"epsilon allowed is {self.target_epsilon:.2f} at delta {self.target_delta:e}"
         if not save:
             raise PrivacyBudgetExhausted(error_message)
         else:
