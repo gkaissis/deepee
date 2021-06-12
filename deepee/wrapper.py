@@ -195,7 +195,10 @@ class PrivacyWrapper(nn.Module):
                     "Clone grads and wrapped grads have different size. "
                     "Did you change the model without calling update_clones()?"
                 )
-            for param, gradient_source in zip(wrapped_grads, model_grads,):
+            for param, gradient_source in zip(
+                wrapped_grads,
+                model_grads,
+            ):
                 if param.requires_grad:
                     param.grad = reduction(torch.stack(gradient_source), dim=0)
         except RuntimeError as e:
@@ -284,10 +287,6 @@ class PrivacyWrapper(nn.Module):
         return nn.ModuleList(models)
 
     def parameters(self):
-        # raise ValueError(
-        #     "The PrivacyWrapper instance has no own parameters."
-        #     " Please use <Instance>.model.parameters()."
-        # )
         return self.wrapped_model.parameters()
 
     def update_clones(self):
@@ -303,7 +302,11 @@ class PrivacyWrapper(nn.Module):
 
 
 class PerSampleGradientWrapper(nn.Module):
-    def __init__(self, base_model: nn.Module, num_replicas: int,) -> None:
+    def __init__(
+        self,
+        base_model: nn.Module,
+        num_replicas: int,
+    ) -> None:
         """Factory class which wraps a PyTorch model to provide access to per-sample
         gradients. It will replicate the base model and peform the forward and backward
         passes in parallel. Contrary to the PrivacyWrapper, this class doesn't offer any
@@ -392,7 +395,9 @@ class PerSampleGradientWrapper(nn.Module):
         ):
             if param.requires_grad:
                 setattr(
-                    param, "accumulated_gradients", torch.stack(gradient_source),
+                    param,
+                    "accumulated_gradients",
+                    torch.stack(gradient_source),
                 )
 
     @torch.no_grad()
