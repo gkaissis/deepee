@@ -113,11 +113,18 @@ BadModuleError                            Traceback (most recent call last)
 BadModuleError: BatchNorm Layers must have track_running_stats turned off, otherwise be replaced with InstanceNorm, LayerNorm or GroupNorm.
 ```
 
-Luckily, this modification can be easily done using the `ModelSurgeon`:
+Luckily, this modification can be easily done using the `ModelSurgeon` (add this code after the definition of the watchdog above):
 
 ```py
+# change BatchNorm to GroupNorm
 surgeon = ModelSurgeon(SurgicalProcedures.BN_to_GN)
-model = surgeon.operate(model) 
+model = surgeon.operate(SimpleNet()) 
+
+# now wrap the model
+model = PrivacyWrapper(model, args.batch_size, 1.0, 1.0, watchdog=watchdog).to(
+    args.device
+)
+optimizer = torch.optim.SGD(model.wrapped_model.parameters(), lr=0.1)
 ```
 
 We can now proceed with training as usual:
